@@ -159,6 +159,12 @@ textarea{min-height:58px;resize:vertical}
 <div class="wrap">
   <div class="banner" id="msgBanner" hidden></div>
 
+  <section class="panel" id="noStores" hidden style="padding:22px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+    <h2>No stores yet</h2>
+    <div class="muted small">Add the store(s) you run in Setup. Then this screen shows bonus status, where to focus, and history.</div>
+    <button class="btn primary" type="button" id="noStoresBtn">Go to Setup — add a store</button>
+  </section>
+
   <!-- ============ SCREEN 1: ALL STORES ============ -->
   <div id="viewOverview" class="screen">
     <header class="top">
@@ -561,8 +567,10 @@ function readHash(){const h=location.hash.slice(1);if(h.startsWith('store-')&&D.
 function render(){
   const stores=storeList();
   if(!cur||!D.stores[cur])cur=stores[0]?stores[0].id:null;
-  if(!stores.length&&view!=='setup')view='setup';
-  for(const [v,id] of [['overview','viewOverview'],['store','viewStore'],['setup','viewSetup']])$(id).hidden=view!==v;
+  const empty=!stores.length&&view!=='setup';
+  $('noStores').hidden=!empty;
+  for(const [v,id] of [['overview','viewOverview'],['store','viewStore'],['setup','viewSetup']])$(id).hidden=empty||view!==v;
+  if(empty){for(const b of document.querySelectorAll('.tab')){b.classList.toggle('on',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false')}return}
   for(const b of document.querySelectorAll('.tab')){b.classList.toggle('on',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false')}
   $('tabStore').textContent=stores.length>1?'Store detail':'My store';
   renderQPicks();
@@ -824,7 +832,8 @@ load();
 if(loadError)showMsg('Saved data on this device could not be read. A copy was kept; use Restore with your latest backup file.');
 else if(weekList().length){const days=D.lastBackup?Math.round((new Date(TODAY)-new Date(D.lastBackup))/864e5):null;
   if(days==null||days>30)showMsg((days==null?'No backup yet.':'Last backup '+days+' days ago.')+' Go to Setup → Backup to keep a copy of your numbers.')}
-view=storeList().length>1?'overview':'store';
+view=storeList().length>1?'overview':storeList().length?'store':'setup';
+$('noStoresBtn').addEventListener('click',()=>go('setup'));
 readHash();
 })();
 
