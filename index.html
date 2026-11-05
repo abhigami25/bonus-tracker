@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Performance Tracker — Dairy Queen</title>
+<meta name="description" content="Weekly performance and quarterly bonus tracker for store managers. Data stays on your device.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Bonus Tracker">
+<meta name="apple-mobile-web-app-title" content="Performance">
 <meta name="theme-color" content="#1f4fd1">
-<style>[hidden]{display:none!important}body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<title>Manager Bonus Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<style>
+<style>[hidden]{display:none!important}body{margin:0}:root{padding-bottom:env(safe-area-inset-bottom,0px)}
 /* Layout: header with store picker → (All stores: leaderboard matrix) or (One store: payout scoreboard → focus → scorecard → weekly log → monthly) → owner settings */
 :root{
   --bg:#f3f5f8; --panel:#ffffff; --ink:#152033; --muted:#5b6678; --line:#d9dee7;
@@ -129,80 +129,118 @@ textarea{min-height:58px;resize:vertical}
 .dots .dot{width:12px;height:12px}
 .by{font-size:.74rem;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+.small{font-size:.86rem}
+.screen{display:flex;flex-direction:column;gap:22px}
+.tabs{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.tabs-in{max-width:1200px;margin:0 auto;display:flex;gap:6px;align-items:center;overflow-x:auto;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.15rem;margin-right:auto;white-space:nowrap;padding-right:8px}
+.tab{font:inherit;font-weight:600;font-size:.88rem;border:1px solid transparent;background:transparent;color:var(--muted);padding:7px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.tab:focus-visible,.pillbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pad{padding:16px 18px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 14px}
+.formgrid .wide{grid-column:1/-1}
+.pillbtn{border:0;cursor:pointer;font:inherit;font-size:.78rem;font-weight:600}
+.foot{text-align:center;padding-top:10px}
+@media (max-width:560px){.brand{display:none}.tabs-in{justify-content:space-between}.tab{flex:1}}
 </style>
-
 </head>
 <body>
+<nav class="tabs" aria-label="Screens">
+  <div class="tabs-in">
+    <span class="brand">Performance Tracker</span>
+    <button type="button" class="tab" id="tabOverview" data-view="overview">All stores</button>
+    <button type="button" class="tab" id="tabStore" data-view="store">My store</button>
+    <button type="button" class="tab" id="tabSetup" data-view="setup">Setup</button>
+  </div>
+</nav>
+
 <div class="wrap">
-  <header class="top">
-    <div>
-      <div class="eyebrow" id="storeLabel">My bonus tracker · private to you</div>
-      <h1 id="qTitle">My store bonus</h1>
-    </div>
-    <div class="picker">
-      <label>Quarter<select id="qPick"></select></label>
-      <button class="btn primary" id="newWeekBtn" type="button" hidden>+ Add Thursday entry</button>
-      <button class="btn" id="csvBtn" type="button" hidden>Export CSV</button>
-      <button class="btn" id="backupBtn" type="button">Backup</button>
-      <button class="btn" id="restoreBtn" type="button">Restore</button>
-      <input id="restoreFile" type="file" accept=".json,application/json" hidden>
-    </div>
-  </header>
+  <div class="banner" id="msgBanner" hidden></div>
 
-  <div class="banner" id="dbBanner" hidden></div>
-  <div class="banner info" id="roBanner" hidden>Your access is view-only, so the tracker can't save your numbers. Ask the person who shared this link to invite you as an Editor.</div>
-  <div class="banner info" id="privNote">Your numbers are saved on this device, in this browser — no account, no internet needed after it loads. Tap <strong>Backup</strong> once a month to keep a copy; use <strong>Restore</strong> to move to a new phone or computer.</div>
+  <!-- ============ SCREEN 1: ALL STORES ============ -->
+  <div id="viewOverview" class="screen">
+    <header class="top">
+      <div>
+        <div class="eyebrow" id="ovEyebrow">Operations view</div>
+        <h1 id="ovTitle">All stores</h1>
+      </div>
+      <div class="picker"><label>Quarter<select id="qPickOv"></select></label></div>
+    </header>
+    <div class="board" id="ovTiles"></div>
 
-  <!-- first-time setup -->
-  <section class="panel" id="setupCard" hidden style="padding:18px;display:flex;flex-direction:column;gap:10px">
-    <h2>Set up your store</h2>
-    <div class="muted" style="font-size:.9rem">One time only. Save your store, role and goals once — after that you only enter the weekly numbers each Thursday.</div>
-    <div class="row"><button class="btn primary" type="button" id="setupBtn">Set up my store</button></div>
-  </section>
-  <!-- ================= ONE STORE ================= -->
-  <div id="viewStore" style="display:flex;flex-direction:column;gap:22px">
+    <section class="block" aria-labelledby="h-ovfocus">
+      <div><h2 id="h-ovfocus">Biggest opportunities across stores</h2><div class="muted small">Bonus dollars not yet secure, added up across your stores. Fix these first.</div></div>
+      <div class="focus" id="ovFocus"></div>
+    </section>
+
+    <section class="block" aria-labelledby="h-ovmatrix">
+      <div><h2 id="h-ovmatrix">Store scorecard</h2><div class="muted small">Quarter to date. Tap a store to open it.</div></div>
+      <div class="tbl-wrap"><table>
+        <thead id="ovHead"></thead>
+        <tbody id="ovBody"></tbody>
+      </table></div>
+      <div class="legend"><span><b style="background:var(--ok)"></b>On track</span><span><b style="background:var(--warn)"></b>At risk</span><span><b style="background:var(--bad)"></b>Missing goal</span><span><b style="background:var(--none-soft);border:1px solid var(--line)"></b>No data</span></div>
+    </section>
+
+    <section class="block" aria-labelledby="h-ovweek">
+      <div><h2 id="h-ovweek">Latest week by store</h2><div class="muted small">Each store's most recent Thursday entry.</div></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Store</th><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Labor</th><th class="r">DT time</th><th>Counts</th><th>Fan</th><th>Action items</th></tr></thead>
+        <tbody id="ovWeekBody"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <!-- ============ SCREEN 2: ONE STORE ============ -->
+  <div id="viewStore" class="screen" hidden>
+    <header class="top">
+      <div>
+        <div class="eyebrow" id="storeLabel">Store</div>
+        <h1 id="qTitle">My store</h1>
+      </div>
+      <div class="picker">
+        <label>Store<select id="storePick"></select></label>
+        <label>Quarter<select id="qPick"></select></label>
+        <button class="btn primary" id="newWeekBtn" type="button">+ Add Thursday entry</button>
+      </div>
+    </header>
+
     <section class="block" aria-labelledby="h-board">
-      <h2 id="h-board" class="eyebrow">Projected payout · quarter to date</h2>
+      <h2 id="h-board" class="eyebrow">Projected bonus · quarter to date</h2>
       <div class="board">
         <div class="panel tile">
           <div class="eyebrow">General manager</div>
           <div class="big num" id="gmBig">—</div>
           <div class="meter" id="gmMeter"></div>
-          <div class="muted" style="font-size:.85rem" id="gmSub">—</div>
+          <div class="muted small" id="gmSub">—</div>
         </div>
         <div class="panel tile">
           <div class="eyebrow">Assistant manager (each)</div>
           <div class="big num" id="amBig">—</div>
           <div class="meter" id="amMeter"></div>
-          <div class="muted" style="font-size:.85rem" id="amSub">—</div>
+          <div class="muted small" id="amSub">—</div>
         </div>
         <div class="panel tile">
           <div class="eyebrow">Gates &amp; deductions</div>
           <div class="gates" id="gates"></div>
-          <div class="muted" style="font-size:.85rem" id="dedSub">—</div>
+          <div class="muted small" id="dedSub">—</div>
         </div>
       </div>
       <div class="legend"><span><b style="background:var(--ok)"></b>On track</span><span><b style="background:var(--warn)"></b>At risk (could still hit)</span><span><b style="background:var(--bad)"></b>Missing goal</span><span><b style="background:var(--none-soft);border:1px solid var(--line)"></b>No data yet</span></div>
     </section>
 
     <section class="block" aria-labelledby="h-focus">
-      <div><h2 id="h-focus">Where to focus this week</h2><div class="muted" style="font-size:.88rem">Ranked by GM bonus dollars at stake, then how far off goal.</div></div>
+      <div><h2 id="h-focus">Where to focus this week</h2><div class="muted small">Ranked by bonus dollars at stake, then how far off goal.</div></div>
       <div class="focus" id="focus"></div>
     </section>
 
     <section class="block" aria-labelledby="h-score">
-      <h2 id="h-score">Criteria scorecard</h2>
+      <h2 id="h-score">Bonus criteria</h2>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Criterion</th><th>Goal</th><th class="r">Quarter to date</th><th class="r">Latest week</th><th class="r">vs prior wk</th><th>Status</th><th class="r">GM $</th><th class="r">AM $</th></tr></thead>
         <tbody id="scoreBody"></tbody>
-      </table></div>
-    </section>
-
-    <section class="block" aria-labelledby="h-weeks">
-      <h2 id="h-weeks">Weekly log</h2>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Cakes</th><th class="r">Cupcakes</th><th>Counts/waste</th><th class="r">Food var</th><th class="r">Labor</th><th class="r">DT time</th><th>Fan fdbk</th><th class="r">Truck miss</th><th>Complaints / why / actions</th><th></th></tr></thead>
-        <tbody id="weekBody"></tbody>
       </table></div>
     </section>
 
@@ -260,7 +298,7 @@ textarea{min-height:58px;resize:vertical}
     </details>
 
     <section class="block" aria-labelledby="h-hist">
-      <div><h2 id="h-hist">Week-by-week history</h2><div class="muted" style="font-size:.88rem">Where your bonus stood after each Thursday entry, quarter to date. Every saved week stays here.</div></div>
+      <div><h2 id="h-hist">Week-by-week history</h2><div class="muted small">Where the bonus stood after each Thursday entry. Every saved week stays here.</div></div>
       <div class="charts">
         <div class="panel chart"><div class="eyebrow" id="chartBonusTitle">Projected bonus after each week</div><div id="chartBonus"></div></div>
         <div class="panel chart"><div class="eyebrow">Sales &amp; transactions vs last year</div><div id="chartPct"></div><div class="legend"><span><b style="background:var(--accent)"></b>Sales %</span><span><b style="background:var(--warn)"></b>Transactions %</span><span>Dashed = goal</span></div></div>
@@ -271,6 +309,14 @@ textarea{min-height:58px;resize:vertical}
       </table></div>
     </section>
 
+    <section class="block" aria-labelledby="h-weeks">
+      <h2 id="h-weeks">Weekly log</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Cakes</th><th class="r">Cupcakes</th><th>Counts/waste</th><th class="r">Food var</th><th class="r">Labor</th><th class="r">DT time</th><th>Fan fdbk</th><th class="r">Truck miss</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="weekBody"></tbody>
+      </table></div>
+    </section>
+
     <section class="block" aria-labelledby="h-month">
       <h2 id="h-month">Monthly roll-up</h2>
       <div class="tbl-wrap"><table>
@@ -278,71 +324,101 @@ textarea{min-height:58px;resize:vertical}
         <tbody id="monthBody"></tbody>
       </table></div>
     </section>
+
+    <details class="panel">
+      <summary>How each bonus is calculated</summary>
+      <div class="howto">
+        <dl id="howto"></dl>
+        <p class="muted small" style="margin-top:14px">Quarter-to-date values average the weekly entries. Sales and transaction averages are a simple average of weekly % changes — close, but the official number uses total quarter dollars and counts. "At risk" means within reach of the line but not safely over it. Payouts shown are estimates; the owner's payout sheet is final.</p>
+      </div>
+    </details>
   </div>
 
+  <!-- ============ SETUP ============ -->
+  <div id="viewSetup" class="screen" hidden>
+    <header class="top"><div><div class="eyebrow">Saved on this device</div><h1>Setup</h1></div></header>
 
-  <details class="panel" id="setPanel">
-    <summary>My profile &amp; goals</summary>
-    <div class="form" id="setView" hidden>
-      <div class="muted" style="font-size:.85rem">Saved on this device. These stay the same every week, so you don't re-enter them.</div>
-      <dl class="profile" id="setSummary"></dl>
-      <div class="row"><button class="btn" type="button" id="editSetBtn">Change settings</button><span class="msg" id="setViewMsg" role="status"></span></div>
-    </div>
-    <form class="form" id="setForm" novalidate>
-      <fieldset>
-        <legend>My store</legend>
-        <label>Store name<input id="s_store" type="text" placeholder="e.g. Nelson"></label>
-        <label>Your name<input id="s_name" type="text" placeholder="optional"></label>
-        <label>My role<select id="s_role"><option value="gm">General manager</option><option value="am">Assistant manager</option></select></label>
-        <label>Labor goal % (must be under)<input id="s_labor" type="number" step="any" placeholder="from your owner"></label>
-        <label class="check"><input id="s_treat" type="checkbox"> Treat store (30 fan surveys / month)</label>
-      </fieldset>
-      <fieldset>
-        <legend>This quarter’s gates (reset to “pending” each new quarter)</legend>
-        <label>EcoSure inspection<select id="s_eco"><option value="pending">Pending</option><option value="pass">Passed</option><option value="fail">Failed</option></select></label>
-        <label>2 AMs with P1, P2 &amp; ServSafe<select id="s_certs"><option value="pending">Not confirmed</option><option value="yes">Yes</option><option value="exception">Exception (approved)</option><option value="no">No</option></select></label>
-      </fieldset>
-      <fieldset>
-        <legend>Goals (from the bonus sheet — change only if your owner changes them)</legend>
-        <label>Sales goal % vs LY<input id="s_sales" type="number" step="any"></label>
-        <label>Transactions goal % vs LY<input id="s_txn" type="number" step="any"></label>
-        <label>Food cost max variance (pts)<input id="s_food" type="number" step="any"></label>
-        <label>Drive-thru goal (m:ss)<input id="s_dt" type="text" placeholder="4:00"></label>
-        <label>Fan score above DMA (pts)<input id="s_fanDma" type="number" step="any"></label>
-        <label>Deliveries goal % vs last qtr<input id="s_deliv" type="number" step="any"></label>
-        <label>Delivery 4–5 star min %<input id="s_stars" type="number" step="any"></label>
-        <label>Shortage threshold $<input id="s_shortMax" type="number" step="any"></label>
-      </fieldset>
-      <div class="row"><button class="btn primary" type="submit" id="setSave">Save settings</button><button class="btn" type="button" id="setCancel" hidden>Cancel</button><span class="msg" id="setMsg" role="status"></span></div>
-    </form>
-  </details>
+    <section class="panel" id="welcome" hidden style="padding:18px;display:flex;flex-direction:column;gap:8px">
+      <h2>Welcome — set up once</h2>
+      <div class="muted small">1) Your name and role. 2) Add each store you run. The bonus goals are already filled in from the bonus sheet. After this you only enter weekly numbers.</div>
+    </section>
 
-  <details class="panel">
-    <summary>How each bonus is calculated</summary>
-    <div class="howto">
-      <dl id="howto"></dl>
-      <p class="muted" style="font-size:.82rem;margin-top:14px">Quarter-to-date values average your weekly entries. Sales and transaction averages are a simple average of weekly % changes, which is close but not exact; the official number uses total quarter dollars and counts. "At risk" means within reach of the line but not safely over it. This is an estimate to steer the week — your owner's payout sheet is final.</p>
-    </div>
-  </details>
+    <section class="panel block pad" aria-labelledby="h-prof">
+      <h2 id="h-prof">You</h2>
+      <dl class="profile" id="profView"></dl>
+      <form id="profForm" class="formgrid" novalidate hidden>
+        <label>Your name<input id="p_name" type="text"></label>
+        <label>Your role<select id="p_role"><option value="om">General &amp; operations manager (several stores)</option><option value="gm">General manager (one store)</option><option value="am">Assistant manager</option></select></label>
+        <div class="row wide"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="profCancel">Cancel</button></div>
+      </form>
+      <div class="row" id="profBtns"><button class="btn" type="button" id="profEdit">Change</button></div>
+    </section>
+
+    <section class="panel block pad" aria-labelledby="h-stores">
+      <h2 id="h-stores">Stores</h2>
+      <div class="storelist" id="storeList"></div>
+      <form id="storeForm" class="formgrid" novalidate hidden>
+        <div class="wide eyebrow" id="storeFormTitle">Add a store</div>
+        <label>Store name<input id="st_name" type="text" placeholder="e.g. Nelson"></label>
+        <label>General manager<input id="st_gm" type="text" placeholder="optional"></label>
+        <label>Labor goal % (must be under)<input id="st_labor" type="number" step="any"></label>
+        <label>EcoSure this quarter<select id="st_eco"><option value="pending">Pending</option><option value="pass">Passed</option><option value="fail">Failed</option></select></label>
+        <label>2 AMs with P1, P2 &amp; ServSafe<select id="st_certs"><option value="pending">Not confirmed</option><option value="yes">Yes</option><option value="exception">Exception (approved)</option><option value="no">No</option></select></label>
+        <label class="check"><input id="st_treat" type="checkbox"> Treat store (30 fan surveys / month)</label>
+        <div class="row wide"><button class="btn primary" type="submit" id="storeSave">Save store</button><button class="btn" type="button" id="storeCancel">Cancel</button><button class="btn danger" type="button" id="storeDel" hidden>Remove store</button><span class="msg" id="storeMsg" role="status"></span></div>
+      </form>
+      <div class="row"><button class="btn primary" type="button" id="storeAdd">+ Add store</button></div>
+    </section>
+
+    <section class="panel block pad" aria-labelledby="h-goals">
+      <h2 id="h-goals">Bonus goals (all stores)</h2>
+      <div class="muted small">From the quarterly bonus sheet. Change only when the owner changes them.</div>
+      <dl class="profile" id="goalView"></dl>
+      <form id="goalForm" class="formgrid" novalidate hidden>
+        <label>Sales goal % vs LY<input id="g_sales" type="number" step="any"></label>
+        <label>Transactions goal % vs LY<input id="g_txn" type="number" step="any"></label>
+        <label>Food cost max variance (pts)<input id="g_food" type="number" step="any"></label>
+        <label>Drive-thru goal (m:ss)<input id="g_dt" type="text" placeholder="4:00"></label>
+        <label>Fan score above DMA (pts)<input id="g_fanDma" type="number" step="any"></label>
+        <label>Deliveries goal % vs last qtr<input id="g_deliv" type="number" step="any"></label>
+        <label>Delivery 4–5 star min %<input id="g_stars" type="number" step="any"></label>
+        <label>Shortage threshold $<input id="g_shortMax" type="number" step="any"></label>
+        <div class="row wide"><button class="btn primary" type="submit">Save goals</button><button class="btn" type="button" id="goalCancel">Cancel</button></div>
+      </form>
+      <div class="row" id="goalBtns"><button class="btn" type="button" id="goalEdit">Change goals</button></div>
+    </section>
+
+    <section class="panel block pad" aria-labelledby="h-data">
+      <h2 id="h-data">Your data</h2>
+      <div class="muted small">Everything is saved in this browser on this device — nothing is sent anywhere. Clearing browser data or private mode erases it. Back up monthly and keep the file in email or cloud storage.</div>
+      <div class="row">
+        <button class="btn" id="backupBtn" type="button">Backup (.json)</button>
+        <button class="btn" id="restoreBtn" type="button">Restore from backup</button>
+        <button class="btn" id="csvBtn" type="button">Export weeks (CSV)</button>
+        <input id="restoreFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </section>
+  </div>
+
+  <footer class="muted small foot">Internal tool for store managers. Not an official Dairy Queen product. Bonus figures are estimates.</footer>
 </div>
 
 <script>
 (function(){
+"use strict";
+// ================= bonus rules (from Quarter bonus sheet) =================
 const CRIT=[
- {k:'sales',name:'Sales vs last year',gm:750,am:200},
- {k:'food',name:'Food cost & daily count/waste entries',gm:500,am:200},
- {k:'labor',name:'Labor cost',gm:500,am:200},
- {k:'fan',name:'Fan feedback',gm:500,am:100},
- {k:'txn',name:'Transaction count vs last year',gm:500,am:150},
- {k:'deliv',name:'Deliveries',gm:250,am:100},
- {k:'truck',name:'Weekly delivery truck counts',gm:500,am:150},
- {k:'dt',name:'Drive-thru speed',gm:500,am:100}
+ {k:'sales',name:'Sales vs last year',short:'Sales',gm:750,am:200},
+ {k:'food',name:'Food cost & daily count/waste entries',short:'Food',gm:500,am:200},
+ {k:'labor',name:'Labor cost',short:'Labor',gm:500,am:200},
+ {k:'fan',name:'Fan feedback',short:'Fan',gm:500,am:100},
+ {k:'txn',name:'Transaction count vs last year',short:'Trans',gm:500,am:150},
+ {k:'deliv',name:'Deliveries',short:'Deliv',gm:250,am:100},
+ {k:'truck',name:'Weekly delivery truck counts',short:'Truck',gm:500,am:150},
+ {k:'dt',name:'Drive-thru speed',short:'DT',gm:500,am:100}
 ];
 const GM_MAX=CRIT.reduce((a,c)=>a+c.gm,0), AM_MAX=CRIT.reduce((a,c)=>a+c.am,0);
-const TODAY=(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date());
-const TQ=quarterOf(TODAY);
-let editingSet=false;
-const DEF={store:'',name:'',role:'gm',laborGoal:null,treat:false,eco:'pending',certs:'pending',label:TQ.label,start:TQ.start,end:TQ.end,salesGoal:6,txnGoal:2,foodMax:2.5,dtGoal:240,fanDma:2,delivGoal:10,starGoal:85,shortMax:180};
+const DEFGOALS={salesGoal:6,txnGoal:2,foodMax:2.5,dtGoal:240,fanDma:2,delivGoal:10,starGoal:85,shortMax:180};
 const TIPS={
  sales:['Push cake & cupcake pre-orders at the register and on the board','Suggest a size-up or add-on on every order','Keep the current promo visible at the menu board and window'],
  txn:['Drive-thru speed drives repeat visits — protect the 4-min line','Promote app/online deals to pull extra visits','Staff slow dayparts with strongest closers'],
@@ -357,14 +433,15 @@ const RULES={
  sales:c=>`Up ${c.salesGoal}% or more vs last year`,
  txn:c=>`Up ${c.txnGoal}% or more vs last year, same period`,
  food:c=>`Actual vs ideal 0 to +${c.foodMax} pts AND 100% daily counts/waste entries`,
- labor:c=>isNum(c.laborGoal)?`Under ${c.laborGoal}%`:'Under goal % (set yours in My store)',
+ labor:c=>isNum(c.laborGoal)?`Under ${c.laborGoal}%`:'Under goal % (set it for this store in Setup)',
  fan:c=>`At least ${c.fanMin} surveys every month, ${c.fanDma}% above DMA`,
  deliv:c=>`Up ${c.delivGoal}% vs last quarter, avg ${c.starGoal}% 4–5 star`,
  truck:()=>'Count every truck. 1 missed count forfeits that month (1/3 of this bonus)',
  dt:c=>`${fmtDT(c.dtGoal)} or faster per order`
 };
+const ROLE_T={om:'General & operations manager',gm:'General manager',am:'Assistant manager'};
 
-let S={...DEF}, hasSettings=false, weeks=[], db=null, user=null, uid=null, canWrite=null, downloads=null, editingId=null, delArmed=false, settingsVersionSeen=false;
+// ================= helpers =================
 const $=id=>document.getElementById(id);
 const isNum=v=>typeof v==='number'&&isFinite(v);
 const avg=a=>{const v=a.filter(isNum);return v.length?v.reduce((x,y)=>x+y,0)/v.length:null};
@@ -373,26 +450,55 @@ const pct=(n,d=1)=>isNum(n)?(n>0?'+':'')+n.toFixed(d)+'%':'—';
 const pctPlain=(n,d=2)=>isNum(n)?n.toFixed(d)+'%':'—';
 function fmtDT(s){if(!isNum(s))return'—';const m=Math.floor(s/60),r=Math.round(s-m*60);return m+':'+String(r).padStart(2,'0')}
 function parseDT(t){if(t==null)return null;t=String(t).trim();if(!t)return null;const m=t.match(/^(\d+):(\d{1,2})$/);if(m)return +m[1]*60+ +m[2];const n=parseFloat(t);if(!isFinite(n))return null;return n>20?n:Math.round(n*60)}
-function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k==='style')e.style.cssText=v;else e.setAttribute(k,v)}for(const k of kids){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(String(k)))}return e}
+function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const[k,v]of Object.entries(attrs)){if(v==null)continue;if(k==='class')e.className=v;else if(k==='style')e.style.cssText=v;else e.setAttribute(k,v)}for(const k of kids){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(String(k)))}return e}
 function pill(s,txt){const L={on:'On track',risk:'At risk',off:'Missing',nodata:'No data'};return el('span',{class:'pill s-'+s},txt||L[s])}
-let viewQ=null;
-const cfg=()=>{const b={...S,fanMin:S.treat?30:35};if(viewQ){b.start=viewQ.start;b.end=viewQ.end;b.label=viewQ.label}return b};
+const numOut=v=>{if(v===''||v==null)return null;const n=Number(v);return isFinite(n)?n:null};
 function quarterOf(d){const y=+d.slice(0,4),q=Math.floor((+d.slice(5,7)-1)/3)+1;const ends=['03-31','06-30','09-30','12-31'];return{label:'Q'+q+' '+y,start:y+'-'+String(q*3-2).padStart(2,'0')+'-01',end:y+'-'+ends[q-1]}}
-function quarterList(){const m=new Map();m.set(S.start,{label:S.label,start:S.start,end:S.end,mine:true});for(const w of weeks){if(!w.date)continue;if(w.date>=S.start&&w.date<=S.end)continue;const q=quarterOf(w.date);if(!m.has(q.start))m.set(q.start,q)}return[...m.values()].sort((a,b)=>b.start.localeCompare(a.start))}
-function renderQPick(){const sel=$('qPick'),list=quarterList();sel.replaceChildren(...list.map(q=>el('option',{value:q.start},q.label+(q.mine?' (current)':''))));sel.value=viewQ?viewQ.start:S.start;sel.disabled=list.length<2}
-$('qPick').addEventListener('change',e=>{const q=quarterList().find(x=>x.start===e.target.value);viewQ=q&&!q.mine?q:null;render()});
+const TODAY=(d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'))(new Date());
+const TQ=quarterOf(TODAY);
 const monthKey=d=>d.slice(0,7);
 function qMonths(c){const out=[];let [y,m]=c.start.split('-').map(Number);const [ey,em]=c.end.split('-').map(Number);let g=0;while((y<ey||(y===ey&&m<=em))&&g++<24){out.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++}}return out}
 function monthName(k){const [y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleString('en-US',{month:'short',year:'numeric'})}
-const qWeeks=c=>weeks.filter(w=>w.date&&w.date>=c.start&&w.date<=c.end).sort((a,b)=>a.date.localeCompare(b.date)||(a.week||0)-(b.week||0));
 function foodVar(w){return isNum(w.foodActual)&&isNum(w.foodTarget)?w.foodActual-w.foodTarget:null}
-function fanMonthOK(ws,c){
-  const w=[...ws].reverse().find(x=>x.fanQ!=null||isNum(x.fanCount)||isNum(x.fanDma));if(!w)return null;
-  if(isNum(w.fanCount)&&isNum(w.fanDma))return w.fanCount>=c.fanMin&&w.fanDma>=c.fanDma;
-  if(w.fanQ!=null)return w.fanQ===true;
-  return null;
-}
+function fileSave(name,text,type){const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+function showMsg(t){const b=$('msgBanner');b.textContent=t;b.hidden=!t}
 
+// ================= storage (this browser only) =================
+const KEY='dqPerformanceTracker.v2', OLD='managerBonusTracker.v1';
+let loadError=false;
+let D={profile:{name:'',role:'om'},goals:{...DEFGOALS},stores:{},weeks:{}};
+function load(){
+  let d=null,raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
+  if(raw){try{d=JSON.parse(raw)}catch(e){try{localStorage.setItem(KEY+'.damaged-'+Date.now(),raw)}catch(e2){}loadError=true;d=null}}
+  if(d&&typeof d!=='object')d=null;
+  if(!d){let o=null;try{o=JSON.parse(localStorage.getItem(OLD)||'null')}catch(e){}
+    if(o&&(o.settings||o.weeks)){const s=o.settings||{};const sid='store-1';
+      d={profile:{name:s.name||'',role:s.role||'gm'},goals:{...DEFGOALS,...pick(s,Object.keys(DEFGOALS))},
+        stores:{[sid]:{name:s.store||'My store',gm:s.name||'',laborGoal:isNum(s.laborGoal)?s.laborGoal:null,treat:!!s.treat,eco:s.eco||'pending',certs:s.certs||'pending',gatesQ:s.gatesQ||TQ.start}},weeks:{}};
+      for(const[id,w]of Object.entries(o.weeks||{}))d.weeks[sid+'--'+id]={...w,storeId:sid};
+      try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}}}
+  d=d||{};D={profile:{name:'',role:'om',...(d.profile||{})},goals:{...DEFGOALS,...(d.goals||{})},stores:d.stores||{},weeks:d.weeks||{},lastBackup:d.lastBackup||null};
+}
+function pick(o,keys){const r={};for(const k of keys)if(o[k]!=null)r[k]=o[k];return r}
+function persist(){try{const txt=JSON.stringify(D);localStorage.setItem(KEY,txt);if(localStorage.getItem(KEY)!==txt)throw new Error('verify');return true}catch(e){showMsg('Could not save on this device. Private/incognito mode or full storage blocks saving. Your last change was NOT saved.');return false}}
+// re-read storage before every change so two open tabs never overwrite each other
+function mutate(fn){load();fn(D);return persist()}
+const storeList=()=>Object.entries(D.stores).map(([id,s])=>({id,...s})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+const weekList=()=>Object.entries(D.weeks).map(([id,w])=>({id,...w}));
+
+// ================= state =================
+let dupArmed=null;
+let view='overview', cur=null, viewQ=null, editingId=null, delArmed=false, editingStore=null, storeDelArmed=false;
+function qCfg(){return viewQ||TQ}
+function cfgFor(s){const q=qCfg();const c={...DEFGOALS,...D.goals,label:q.label,start:q.start,end:q.end,role:D.profile.role,
+  laborGoal:s&&isNum(s.laborGoal)?s.laborGoal:null,treat:!!(s&&s.treat),fanMin:s&&s.treat?30:35,store:s?s.name:'',gm:s?s.gm:''};
+  const gatesCurrent=s&&(!s.gatesQ||s.gatesQ===TQ.start)&&q.start===TQ.start;
+  c.eco=gatesCurrent?(s.eco||'pending'):'pending';c.certs=gatesCurrent?(s.certs||'pending'):'pending';c.gatesKnown=gatesCurrent;return c}
+const weeksFor=(sid,c)=>weekList().filter(w=>w.storeId===sid&&w.date&&w.date>=c.start&&w.date<=c.end).sort((a,b)=>a.date.localeCompare(b.date)||(a.week||0)-(b.week||0));
+function fanMonthOK(ws,c){const w=[...ws].reverse().find(x=>x.fanQ!=null||isNum(x.fanCount)||isNum(x.fanDma));if(!w)return null;
+  if(isNum(w.fanCount)&&isNum(w.fanDma))return w.fanCount>=c.fanMin&&w.fanDma>=c.fanDma;if(w.fanQ!=null)return w.fanQ===true;return null}
+
+// ================= scoring =================
 function evaluate(ws,c){
   const last=ws[ws.length-1], prev=ws[ws.length-2], R={}, months=qMonths(c);
   const trend=(f,hb)=>{if(!last||!prev)return null;const a=f(last),b=f(prev);if(!isNum(a)||!isNum(b))return null;const d=a-b;return{d,good:hb?d>=0:d<=0}};
@@ -401,15 +507,15 @@ function evaluate(ws,c){
    R.sales={s,val:pct(v),lw:last?pct(last.sales):'—',tr:trend(w=>w.sales,true),trFmt:pts,gap}}
   {const v=avg(ws.map(w=>w.txn)),g=c.txnGoal;let s='nodata',gap='';if(isNum(v)){s=v>=g+1?'on':v>=g-1.5?'risk':'off';gap=v>=g?`${(v-g).toFixed(1)} pts cushion over ${g}%`:`${(g-v).toFixed(1)} pts short of ${g}%`}
    R.txn={s,val:pct(v),lw:last?pct(last.txn):'—',tr:trend(w=>w.txn,true),trFmt:pts,gap}}
-  {const missed=ws.some(w=>w.counts===false), any=ws.some(w=>w.counts!=null);const v=avg(ws.map(foodVar)),mx=c.foodMax;let s='nodata',gap='';
+  {const missed=ws.some(w=>w.counts===false),any=ws.some(w=>w.counts!=null);const v=avg(ws.map(foodVar)),mx=c.foodMax;let s='nodata',gap='';
    if(missed){s='off';gap='A week had incomplete counts/waste entries — category forfeited'}
    else if(isNum(v)){if(v>mx){s='off';gap=`Variance ${v.toFixed(2)} pts is over the +${mx} max`}else if(v<0){s='risk';gap=`Actual is under ideal by ${(-v).toFixed(2)} pts — check counts are correct`}else if(v>mx-0.5){s='risk';gap=`Only ${(mx-v).toFixed(2)} pts under the +${mx} max`}else{s='on';gap=`${(mx-v).toFixed(2)} pts of room under the max`}}
-   else if(any){gap='Counts are clear. Enter actual vs target food cost to score this'}
+   else if(any)gap='Counts are clear. Enter actual vs target food cost to score this';
    const lf=last?foodVar(last):null;
    R.food={s,val:isNum(v)?(v>=0?'+':'')+v.toFixed(2)+' pts':(any?'Counts clear':'—'),lw:last?(isNum(lf)?(lf>=0?'+':'')+lf.toFixed(2)+' pts':(last.counts===true?'Counts ✓':last.counts===false?'Counts ✗':'—')):'—',tr:trend(foodVar,false),trFmt:d=>(d>0?'+':'')+d.toFixed(2)+' pts',gap}}
   {const v=avg(ws.map(w=>w.labor)),g=c.laborGoal;let s='nodata',gap='';
    if(isNum(v)&&isNum(g)){s=v<g-0.5?'on':v<g?'risk':'off';gap=v<g?`${(g-v).toFixed(2)} pts under the ${g}% goal`:`${(v-g).toFixed(2)} pts over the ${g}% goal`}
-   else if(isNum(v))gap='Labor is entered. Set your labor goal % in My store to score it';
+   else if(isNum(v))gap='Labor is entered. Set this store’s labor goal % in Setup to score it';
    R.labor={s,val:pctPlain(v),lw:last?pctPlain(last.labor):'—',tr:trend(w=>w.labor,false),trFmt:d=>(d>0?'+':'')+d.toFixed(2)+' pts',gap}}
   {const v=avg(ws.map(w=>w.dt)),g=c.dtGoal;let s='nodata',gap='';if(isNum(v)){s=v<=g-10?'on':v<=g?'risk':'off';gap=v<=g?`${Math.round(g-v)} sec under the ${fmtDT(g)} line`:`${Math.round(v-g)} sec over the ${fmtDT(g)} line`}
    R.dt={s,val:fmtDT(v),lw:last?fmtDT(last.dt):'—',tr:trend(w=>w.dt,false),trFmt:d=>(d>0?'+':'')+Math.round(d)+' sec',gap}}
@@ -424,143 +530,193 @@ function evaluate(ws,c){
      if(okV&&okS){s='on';gap='Both delivery goals met'}else if((isNum(v)&&v<c.delivGoal-5)||(isNum(st)&&st<c.starGoal-5)){s='off';gap=parts.join('; ')}else{s='risk';gap=parts.join('; ')}}
    R.deliv={s,val:(isNum(v)?pct(v):'—')+(isNum(st)?' · '+st.toFixed(0)+'%★':''),lw:last&&isNum(last.deliv)?pct(last.deliv):'—',tr:trend(w=>w.deliv,true),trFmt:pts,gap}}
   {const misses=months.map(m=>{const x=ws.filter(w=>monthKey(w.date)===m&&isNum(w.truck));return x.length?x.reduce((a,w)=>a+w.truck,0):null});
-   const bad=misses.filter(x=>x>0).length, known=misses.filter(x=>x!=null).length;let s='nodata',gap='';
+   const bad=misses.filter(x=>x>0).length,known=misses.filter(x=>x!=null).length;let s='nodata',gap='';
    if(known){s=bad?(bad===months.length?'off':'risk'):'on';gap=bad?`${bad} month(s) forfeited by a missed count — ${months.length-bad} still open`:'No missed counts so far'}
    R.truck={s,val:known?`${misses.reduce((a,x)=>a+(x||0),0)} missed`:'—',lw:last&&isNum(last.truck)?String(last.truck):'—',tr:null,gap,share:months.length?(months.length-bad)/months.length:1,partial:bad>0&&bad<months.length}}
   return R;
 }
-function payout(R){
-  const P={gmOn:0,amOn:0,gmRisk:0,amRisk:0,gmOff:0,amOff:0,gmNo:0,amNo:0};
+function payout(R){const P={gmOn:0,amOn:0,gmRisk:0,amRisk:0,gmOff:0,amOff:0,gmNo:0,amNo:0};
   for(const c of CRIT){const r=R[c.k];let g=c.gm,a=c.am;
     if(c.k==='truck'&&r.s!=='nodata'){const kg=g*r.share,ka=a*r.share;P.gmOff+=g-kg;P.amOff+=a-ka;g=kg;a=ka;if(r.partial){P.gmOn+=g;P.amOn+=a;continue}}
     const key={on:'On',risk:'Risk',off:'Off',nodata:'No'}[r.s];P['gm'+key]+=g;P['am'+key]+=a}
-  return P;
-}
+  return P}
+function summarize(s,wsOverride){const c=cfgFor(s),ws=wsOverride||weeksFor(s.id,c),R=evaluate(ws,c),P=payout(R);
+  const blocked=c.eco==='fail'||c.certs==='no';const sum=f=>ws.reduce((a,w)=>a+(isNum(w[f])?w[f]:0),0);
+  const shortT=sum('short'),ded=(shortT>c.shortMax?shortT:0)+sum('payout')+sum('noReceipt');
+  return{s,c,ws,R,P,blocked,shortT,ded,last:ws[ws.length-1],
+    gmLikely:blocked?0:Math.max(0,P.gmOn-ded),amLikely:blocked?0:P.amOn,
+    gmBest:blocked?0:Math.max(0,P.gmOn+P.gmRisk+P.gmNo-ded),amBest:blocked?0:P.amOn+P.amRisk+P.amNo}}
+const RANK={off:3,risk:2,nodata:1,on:0};
+const dollarsFor=(cr)=>D.profile.role==='am'?cr.am:cr.gm;
 
+// ================= navigation =================
+function go(v,storeId){view=v;if(storeId)cur=storeId;
+  const h=v==='store'&&cur?'store-'+cur:v;try{if(location.hash!=='#'+h)history.replaceState(null,'','#'+h)}catch(e){}
+  render();window.scrollTo(0,0)}
+for(const b of document.querySelectorAll('.tab'))b.addEventListener('click',()=>go(b.dataset.view));
+window.addEventListener('hashchange',readHash);
+function readHash(){const h=location.hash.slice(1);if(h.startsWith('store-')&&D.stores[h.slice(6)]){view='store';cur=h.slice(6)}else if(h==='overview'||h==='setup'||h==='store')view=h;render()}
+
+// ================= render =================
 function render(){
-  const c=cfg(), ws=qWeeks(c), R=evaluate(ws,c), P=payout(R), last=ws[ws.length-1];
-  const ready=!!db&&uid!==null;
-  renderQPick();renderHistory(c,ws);
-  $('setupCard').hidden=!(ready&&!hasSettings&&canWrite!==false);
-  $('newWeekBtn').hidden=!ready||canWrite===false;
-  $('csvBtn').hidden=!downloads||!weeks.length;
-  $('qTitle').textContent=(c.store||'My store')+' — '+(c.label||'quarter')+' bonus';
-  $('storeLabel').textContent=(c.name?c.name+' · ':'')+'Saved on this device'+(c.role==='am'?' · assistant manager view':' · general manager view')+(last?' · through week '+(last.week??'?'):'');
+  const stores=storeList();
+  if(!cur||!D.stores[cur])cur=stores[0]?stores[0].id:null;
+  if(!stores.length&&view!=='setup')view='setup';
+  for(const [v,id] of [['overview','viewOverview'],['store','viewStore'],['setup','viewSetup']])$(id).hidden=view!==v;
+  for(const b of document.querySelectorAll('.tab')){b.classList.toggle('on',b.dataset.view===view);b.setAttribute('aria-current',b.dataset.view===view?'page':'false')}
+  $('tabStore').textContent=stores.length>1?'Store detail':'My store';
+  renderQPicks();
+  if(view==='overview')renderOverview(stores);
+  else if(view==='store')renderStore(D.stores[cur]?{id:cur,...D.stores[cur]}:null);
+  else renderSetup(stores);
+}
+function quarterList(){const m=new Map();m.set(TQ.start,{...TQ,mine:true});for(const w of weekList()){if(!w.date)continue;const q=quarterOf(w.date);if(!m.has(q.start))m.set(q.start,q)}return[...m.values()].sort((a,b)=>b.start.localeCompare(a.start))}
+function renderQPicks(){const list=quarterList();for(const id of ['qPick','qPickOv']){const sel=$(id);sel.replaceChildren(...list.map(q=>el('option',{value:q.start},q.label+(q.mine?' (current)':''))));sel.value=(viewQ||TQ).start;sel.disabled=list.length<2}}
+for(const id of ['qPick','qPickOv'])$(id).addEventListener('change',e=>{const q=quarterList().find(x=>x.start===e.target.value);viewQ=q&&!q.mine?q:null;render()});
 
-  const blocked=c.eco==='fail'||c.certs==='no';
-  const sum=f=>ws.reduce((a,w)=>a+(isNum(w[f])?w[f]:0),0);
-  const shortT=sum('short'), ded=(shortT>c.shortMax?shortT:0)+sum('payout')+sum('noReceipt');
-  const gmLikely=blocked?0:Math.max(0,P.gmOn-ded), amLikely=blocked?0:P.amOn;
-  const gmBest=blocked?0:Math.max(0,P.gmOn+P.gmRisk+P.gmNo-ded), amBest=blocked?0:P.amOn+P.amRisk+P.amNo;
-  $('gmBig').replaceChildren(money(gmLikely),' ',el('small',null,'/ '+money(GM_MAX)));
-  $('amBig').replaceChildren(money(amLikely),' ',el('small',null,'/ '+money(AM_MAX)));
-  const meter=(id,on,risk,no,off,max)=>{$(id).replaceChildren(...[[on,'var(--ok)'],[risk,'var(--warn)'],[no,'var(--none-soft)'],[off,'var(--bad)']].map(([v,col])=>{const i=el('i');i.style.width=(blocked?0:v/max*100)+'%';i.style.background=col;return i}))};
+// ---------- SCREEN 1 ----------
+function renderOverview(stores){
+  const q=qCfg();const xs=stores.map(s=>summarize(s));
+  $('ovEyebrow').textContent=(D.profile.name?D.profile.name+' · ':'')+ROLE_T[D.profile.role||'om']+' · '+q.label;
+  $('ovTitle').textContent=stores.length>1?'All stores':'Store overview';
+  const tot=xs.reduce((a,x)=>({likely:a.likely+x.gmLikely,best:a.best+x.gmBest}),{likely:0,best:0});
+  const max=GM_MAX*xs.length, gateIssues=xs.filter(x=>x.blocked).length, noEntry=xs.filter(x=>!x.ws.length).length;
+  $('ovTiles').replaceChildren(
+    el('div',{class:'panel tile'},el('div',{class:'eyebrow'},'GM bonus on track'),el('div',{class:'big num'},money(tot.likely),' ',el('small',null,'/ '+money(max))),el('div',{class:'muted small'},'Across '+xs.length+' store'+(xs.length===1?'':'s'))),
+    el('div',{class:'panel tile'},el('div',{class:'eyebrow'},'Still winnable'),el('div',{class:'big num'},money(Math.max(0,tot.best-tot.likely))),el('div',{class:'muted small'},'If at-risk and unscored items hit')),
+    el('div',{class:'panel tile'},el('div',{class:'eyebrow'},'Needs attention'),el('div',{class:'gates'},
+      gateIssues?pill('off',gateIssues+' store'+(gateIssues>1?'s':'')+' blocked by a gate'):pill('on','No gate failures'),
+      noEntry?pill('nodata',noEntry+' store'+(noEntry>1?'s':'')+' with no entries'):null)));
+  // opportunities
+  const agg=CRIT.map(cr=>{let amt=0,stores=[];for(const x of xs){const st=x.R[cr.k].s;if(st==='off'||st==='risk'){amt+=dollarsFor(cr);stores.push({x,st})}}return{cr,amt,stores}}).filter(a=>a.amt>0).sort((a,b)=>b.amt-a.amt).slice(0,4);
+  const f=$('ovFocus');f.replaceChildren();
+  if(!xs.some(x=>x.ws.length))f.append(el('div',{class:'panel empty'},'Add Thursday entries for your stores to see where to focus.'));
+  else if(!agg.length)f.append(el('div',{class:'panel empty'},'No criterion is at risk or missing in any store. Keep it up.'));
+  for(const a of agg){const worst=a.stores.some(s=>s.st==='off')?'off':'risk';
+    f.append(el('div',{class:'panel fcard b-'+worst},el('h3',null,el('span',null,a.cr.name),el('span',{class:'num muted',style:'font-size:.85rem'},money(a.amt)+' at stake')),
+      el('div',{class:'gates'},...a.stores.map(s=>{const b=el('button',{type:'button',class:'pill s-'+s.st+' pillbtn'},s.x.s.name||'Store');b.addEventListener('click',()=>go('store',s.x.s.id));return b})),
+      el('ul',null,...TIPS[a.cr.k].slice(0,2).map(t=>el('li',null,t)))))}
+  // matrix
+  $('ovHead').replaceChildren(el('tr',null,el('th',null,'Store'),el('th',null,'Through'),...CRIT.map(c=>el('th',{class:'rot',title:c.name},c.short)),el('th',{class:'r'},'GM on track'),el('th',{class:'r'},'GM best'),el('th',null,'Top focus')));
+  const body=$('ovBody');body.replaceChildren();
+  [...xs].sort((a,b)=>b.gmLikely-a.gmLikely).forEach(x=>{
+    const top=CRIT.filter(c=>x.R[c.k].s!=='on').sort((a,b)=>(RANK[x.R[b.k].s]-RANK[x.R[a.k].s])||(dollarsFor(b)-dollarsFor(a)))[0];
+    const tr=el('tr',{class:'link',tabindex:'0'},
+      el('td',null,el('strong',null,x.s.name||'Store'),x.s.gm?el('div',{class:'by'},'GM: '+x.s.gm):null,x.blocked?el('div',null,pill('off','Gate failed — $0')):null),
+      el('td',{class:'num'},x.last?'Wk '+(x.last.week??'?'):'—'),
+      ...CRIT.map(c=>{const r=x.R[c.k];return el('td',{class:'c',title:c.name+': '+(r.gap||'no data')},el('span',{class:'dot s-'+r.s,role:'img','aria-label':c.name+' '+r.s}))}),
+      el('td',{class:'r num'},el('strong',null,money(x.gmLikely))),el('td',{class:'r num muted'},money(x.gmBest)),
+      el('td',{class:'note'},top?top.name+(x.R[top.k].gap?' — '+x.R[top.k].gap:''):'All on track'));
+    const open=()=>go('store',x.s.id);tr.addEventListener('click',open);tr.addEventListener('keydown',e=>{if(e.key==='Enter')open()});body.append(tr)});
+  // latest week
+  const wb=$('ovWeekBody');wb.replaceChildren();
+  for(const x of xs){const w=x.last,c=x.c;
+    if(!w){wb.append(el('tr',null,el('td',null,el('strong',null,x.s.name)),el('td',{colspan:'8',class:'muted'},'No entry this quarter')));continue}
+    wb.append(el('tr',null,el('td',null,el('strong',null,x.s.name)),el('td',{class:'num'},'Wk '+(w.week??'?')),
+      el('td',{class:'r num '+cls(w.sales,c.salesGoal,c.salesGoal-2,true)},pct(w.sales)),el('td',{class:'r num '+cls(w.txn,c.txnGoal,c.txnGoal-1.5,true)},pct(w.txn)),
+      el('td',{class:'r num '+(isNum(c.laborGoal)?cls(w.labor,c.laborGoal-0.5,c.laborGoal,false):'')},pctPlain(w.labor)),el('td',{class:'r num '+cls(w.dt,c.dtGoal-10,c.dtGoal,false)},fmtDT(w.dt)),
+      el('td',{class:w.counts===true?'c-ok':w.counts===false?'c-bad':''},w.counts===true?'Clear':w.counts===false?'Missed':'—'),
+      el('td',{class:w.fanQ===true?'c-ok':w.fanQ===false?'c-bad':''},w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':'—'),
+      el('td',{class:'note'},w.actions||'—')))}
+}
+function cls(v,good,warn,higher){return !isNum(v)?'':higher?(v>=good?'c-ok':v>=warn?'c-warn':'c-bad'):(v<=good?'c-ok':v<=warn?'c-warn':'c-bad')}
+
+// ---------- SCREEN 2 ----------
+function renderStore(s){
+  const sp=$('storePick');sp.replaceChildren(...storeList().map(x=>el('option',{value:x.id},x.name||'Store')));if(s)sp.value=s.id;sp.disabled=storeList().length<2;
+  if(!s)return;
+  const x=summarize(s),{c,ws,R,P}=x,last=x.last,useAm=D.profile.role==='am';
+  $('qTitle').textContent=s.name||'Store';
+  $('storeLabel').textContent=[c.label,s.gm?'GM: '+s.gm:null,last?'through week '+(last.week??'?'):'no entries yet'].filter(Boolean).join(' · ');
+  $('gmBig').replaceChildren(money(x.gmLikely),' ',el('small',null,'/ '+money(GM_MAX)));
+  $('amBig').replaceChildren(money(x.amLikely),' ',el('small',null,'/ '+money(AM_MAX)));
+  const meter=(id,on,risk,no,off,max)=>$(id).replaceChildren(...[[on,'var(--ok)'],[risk,'var(--warn)'],[no,'var(--none-soft)'],[off,'var(--bad)']].map(([v,col])=>{const i=el('i');i.style.width=(x.blocked?0:v/max*100)+'%';i.style.background=col;return i}));
   meter('gmMeter',P.gmOn,P.gmRisk,P.gmNo,P.gmOff,GM_MAX);meter('amMeter',P.amOn,P.amRisk,P.amNo,P.amOff,AM_MAX);
-  $('gmSub').textContent=blocked?'Blocked by a quarter gate — see right':`On track now. Up to ${money(gmBest)} if at-risk and unscored items hit. ${money(P.gmOff)} already lost.`;
-  $('amSub').textContent=blocked?'Blocked by a quarter gate — see right':`On track now. Up to ${money(amBest)} if at-risk and unscored items hit.`;
-  const ecoS={pass:'on',fail:'off',pending:'nodata'}[c.eco]||'nodata', certS={yes:'on',exception:'on',no:'off',pending:'nodata'}[c.certs]||'nodata';
-  $('gates').replaceChildren(
-    pill(ecoS,'EcoSure: '+({pass:'passed',fail:'FAILED — all bonus forfeited',pending:'pending'}[c.eco]||'pending')),
-    pill(certS,'2 certified AMs: '+({yes:'yes',exception:'exception',no:'NO — not eligible',pending:'confirm'}[c.certs]||'confirm')),
-    pill(shortT>c.shortMax?'off':shortT>c.shortMax*0.7?'risk':'on','Shortages '+money(shortT)+' / '+money(c.shortMax)));
-  $('dedSub').textContent=ded?`${money(ded)} deducted from GM projection (shortage over limit, unapproved payouts, payouts without receipt).`:'No deductions logged this quarter.';
-
-  const sb=$('scoreBody');sb.replaceChildren();
-  for(const cr of CRIT){const r=R[cr.k];
-    let td5='—';if(r.tr)td5=el('span',{class:'delta '+(r.tr.good?'up':'down')},(r.tr.d>0?'▲ ':r.tr.d<0?'▼ ':'')+r.trFmt(r.tr.d));
-    let gm=money(cr.gm),am=money(cr.am);if(cr.k==='truck'&&r.s!=='nodata'&&r.share<1){gm=money(cr.gm*r.share)+' of '+money(cr.gm);am=money(cr.am*r.share)+' of '+money(cr.am)}
-    sb.append(el('tr',null,el('td',null,el('strong',null,cr.name),r.gap?el('div',{class:'note'},r.gap):null),el('td',{class:'rule'},RULES[cr.k](c)),el('td',{class:'r num'},r.val),el('td',{class:'r num'},r.lw),el('td',{class:'r num'},td5),el('td',null,pill(r.s)),el('td',{class:'r num'},gm),el('td',{class:'r num'},am)));
-  }
-  sb.append(el('tr',null,el('td',{colspan:'6'},el('strong',null,'Total possible')),el('td',{class:'r num'},el('strong',null,money(GM_MAX))),el('td',{class:'r num'},el('strong',null,money(AM_MAX)))));
-
-  const rank={off:3,risk:2,nodata:1,on:0}, useAm=c.role==='am';
-  const items=CRIT.filter(cr=>R[cr.k].s!=='on').sort((a,b)=>(rank[R[b.k].s]-rank[R[a.k].s])||((useAm?b.am-a.am:b.gm-a.gm))).slice(0,4);
+  $('gmSub').textContent=x.blocked?'Blocked by a quarter gate — see right':`On track now. Up to ${money(x.gmBest)} if at-risk and unscored items hit. ${money(P.gmOff)} already lost.`;
+  $('amSub').textContent=x.blocked?'Blocked by a quarter gate — see right':`On track now. Up to ${money(x.amBest)} if at-risk and unscored items hit.`;
+  const ecoS={pass:'on',fail:'off',pending:'nodata'}[c.eco]||'nodata',certS={yes:'on',exception:'on',no:'off',pending:'nodata'}[c.certs]||'nodata';
+  $('gates').replaceChildren(pill(ecoS,'EcoSure: '+({pass:'passed',fail:'FAILED — all bonus forfeited',pending:'pending'}[c.eco])),
+    pill(certS,'2 certified AMs: '+({yes:'yes',exception:'exception',no:'NO — not eligible',pending:'confirm'}[c.certs])),
+    pill(x.shortT>c.shortMax?'off':x.shortT>c.shortMax*0.7?'risk':'on','Shortages '+money(x.shortT)+' / '+money(c.shortMax)));
+  $('dedSub').textContent=(x.ded?`${money(x.ded)} deducted from GM projection (shortage over limit, unapproved payouts, payouts without receipt). `:'No deductions logged this quarter. ')+(c.gatesKnown?'':'Gates show pending for past quarters.');
+  // focus
+  const items=CRIT.filter(cr=>R[cr.k].s!=='on').sort((a,b)=>(RANK[R[b.k].s]-RANK[R[a.k].s])||(dollarsFor(b)-dollarsFor(a))).slice(0,4);
   const fx=$('focus');fx.replaceChildren();
-  if(!ws.length)fx.append(el('div',{class:'panel empty'},'Add your first Thursday entry to see where to focus.'));
+  if(!ws.length)fx.append(el('div',{class:'panel empty'},'Add the first Thursday entry to see where to focus.'));
   else if(!items.length)fx.append(el('div',{class:'panel empty'},'Every criterion is on track. Keep the same habits and protect the cushion.'));
-  for(const cr of items){const r=R[cr.k];
-    fx.append(el('div',{class:'panel fcard b-'+r.s},el('h3',null,el('span',null,cr.name),el('span',{class:'num muted',style:'font-size:.85rem'},useAm?money(cr.am)+' AM':money(cr.gm)+' GM')),el('div',null,pill(r.s)),el('div',{class:'gap'},r.gap||'No entries yet — record it at Thursday’s meeting.'),el('ul',null,...TIPS[cr.k].map(t=>el('li',null,t)))))}
-
+  for(const cr of items){const r=R[cr.k];fx.append(el('div',{class:'panel fcard b-'+r.s},el('h3',null,el('span',null,cr.name),el('span',{class:'num muted',style:'font-size:.85rem'},useAm?money(cr.am)+' AM':money(cr.gm)+' GM')),el('div',null,pill(r.s)),el('div',{class:'gap'},r.gap||'No entries yet — record it at Thursday’s meeting.'),el('ul',null,...TIPS[cr.k].map(t=>el('li',null,t)))))}
+  // scorecard
+  const sb=$('scoreBody');sb.replaceChildren();
+  for(const cr of CRIT){const r=R[cr.k];let td5='—';if(r.tr)td5=el('span',{class:'delta '+(r.tr.good?'up':'down')},(r.tr.d>0?'▲ ':r.tr.d<0?'▼ ':'')+r.trFmt(r.tr.d));
+    let gm=money(cr.gm),am=money(cr.am);if(cr.k==='truck'&&r.s!=='nodata'&&r.share<1){gm=money(cr.gm*r.share)+' of '+money(cr.gm);am=money(cr.am*r.share)+' of '+money(cr.am)}
+    sb.append(el('tr',null,el('td',null,el('strong',null,cr.name),r.gap?el('div',{class:'note'},r.gap):null),el('td',{class:'rule'},RULES[cr.k](c)),el('td',{class:'r num'},r.val),el('td',{class:'r num'},r.lw),el('td',{class:'r num'},td5),el('td',null,pill(r.s)),el('td',{class:'r num'},gm),el('td',{class:'r num'},am)))}
+  sb.append(el('tr',null,el('td',{colspan:'6'},el('strong',null,'Total possible')),el('td',{class:'r num'},el('strong',null,money(GM_MAX))),el('td',{class:'r num'},el('strong',null,money(AM_MAX)))));
+  renderHistory(s,c,ws,useAm);
+  // weekly log
   const wb=$('weekBody');wb.replaceChildren();
-  if(!ws.length)wb.append(el('tr',null,el('td',{colspan:'13',class:'empty'},'No weeks in this quarter yet. Use “Add Thursday entry” after each meeting.')));
-  const cls=(v,good,warn,higher)=>!isNum(v)?'':higher?(v>=good?'c-ok':v>=warn?'c-warn':'c-bad'):(v<=good?'c-ok':v<=warn?'c-warn':'c-bad');
-  [...ws].reverse().forEach(w=>{
-    const fv=foodVar(w);
-    const fan=w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':isNum(w.fanCount)?w.fanCount+' / '+c.fanMin:'—';
+  if(!ws.length)wb.append(el('tr',null,el('td',{colspan:'13',class:'empty'},'No weeks in this quarter yet. Tap “Add Thursday entry” after each meeting.')));
+  [...ws].reverse().forEach(w=>{const fv=foodVar(w);const fan=w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':isNum(w.fanCount)?w.fanCount+' / '+c.fanMin:'—';
     const disc=[w.complaints&&('Complaints: '+w.complaints),w.why&&('Why: '+w.why),w.actions&&('Action: '+w.actions)].filter(Boolean).join(' · ');
-    const editB=el('button',{class:'btn small',type:'button'},canWrite===false||!db?'View':'Edit');editB.addEventListener('click',()=>openForm(w));
-    wb.append(el('tr',null,
-      el('td',null,el('strong',null,'Wk '+(w.week??'?')),el('div',{class:'by'},w.date)),
-      el('td',{class:'r num '+cls(w.sales,c.salesGoal,c.salesGoal-2,true)},pct(w.sales)),
-      el('td',{class:'r num '+cls(w.txn,c.txnGoal,c.txnGoal-1.5,true)},pct(w.txn)),
-      el('td',{class:'r num'},isNum(w.cakes)?(w.cakes>0?'+':'')+w.cakes:'—'),
-      el('td',{class:'r num'},isNum(w.cupcakes)?(w.cupcakes>0?'+':'')+w.cupcakes:'—'),
+    const b=el('button',{class:'btn small',type:'button'},'Edit');b.addEventListener('click',()=>openForm(w));
+    wb.append(el('tr',null,el('td',null,el('strong',null,'Wk '+(w.week??'?')),el('div',{class:'by'},w.date)),
+      el('td',{class:'r num '+cls(w.sales,c.salesGoal,c.salesGoal-2,true)},pct(w.sales)),el('td',{class:'r num '+cls(w.txn,c.txnGoal,c.txnGoal-1.5,true)},pct(w.txn)),
+      el('td',{class:'r num'},isNum(w.cakes)?(w.cakes>0?'+':'')+w.cakes:'—'),el('td',{class:'r num'},isNum(w.cupcakes)?(w.cupcakes>0?'+':'')+w.cupcakes:'—'),
       el('td',{class:w.counts===true?'c-ok':w.counts===false?'c-bad':''},w.counts===true?'Clear':w.counts===false?'Missed':'—'),
       el('td',{class:'r num '+(isNum(fv)?(fv<0||fv>c.foodMax?'c-bad':fv>c.foodMax-0.5?'c-warn':'c-ok'):'')},isNum(fv)?(fv>=0?'+':'')+fv.toFixed(2):'—'),
       el('td',{class:'r num '+(isNum(c.laborGoal)?cls(w.labor,c.laborGoal-0.5,c.laborGoal,false):'')},pctPlain(w.labor)),
       el('td',{class:'r num '+cls(w.dt,c.dtGoal-10,c.dtGoal,false)},fmtDT(w.dt)),
       el('td',{class:w.fanQ===true?'c-ok':w.fanQ===false?'c-bad':''},fan),
       el('td',{class:'r num '+(isNum(w.truck)?(w.truck>0?'c-bad':'c-ok'):'')},isNum(w.truck)?String(w.truck):'—'),
-      el('td',{class:'note'},disc||'—'),
-      el('td',null,editB)))});
-
-  const mb=$('monthBody');mb.replaceChildren();
-  const tg=CRIT.find(cr=>cr.k==='truck'), months=qMonths(c);
-  for(const m of months){const xs=ws.filter(w=>monthKey(w.date)===m);const ok=fanMonthOK(xs,c);
-    const miss=xs.filter(w=>isNum(w.truck));const missT=miss.reduce((a,w)=>a+w.truck,0);const share=1/months.length;
-    const truck$=!miss.length?'—':missT>0?'$0 (forfeited)':money(tg.gm*share)+' / '+money(tg.am*share);
+      el('td',{class:'note'},disc||'—'),el('td',null,b)))});
+  // monthly
+  const mb=$('monthBody');mb.replaceChildren();const tg=CRIT.find(cr=>cr.k==='truck'),months=qMonths(c);
+  for(const m of months){const xs=ws.filter(w=>monthKey(w.date)===m),ok=fanMonthOK(xs,c),miss=xs.filter(w=>isNum(w.truck)),missT=miss.reduce((a,w)=>a+w.truck,0),share=1/months.length;
     mb.append(el('tr',null,el('td',null,el('strong',null,monthName(m))),el('td',{class:'r num'},String(xs.length)),
       el('td',{class:'r num'},pct(avg(xs.map(w=>w.sales)))),el('td',{class:'r num'},pct(avg(xs.map(w=>w.txn)))),
       el('td',{class:'r num'},(v=>isNum(v)?(v>=0?'+':'')+v.toFixed(2)+' pts':'—')(avg(xs.map(foodVar)))),
       el('td',{class:'r num'},pctPlain(avg(xs.map(w=>w.labor)))),el('td',{class:'r num'},fmtDT(avg(xs.map(w=>w.dt)))),
-      el('td',null,ok==null?'—':pill(ok?'on':'off',ok?'Qualified':'Missed')),el('td',{class:'r num'},miss.length?String(missT):'—'),el('td',{class:'r num'},truck$)))}
-
+      el('td',null,ok==null?'—':pill(ok?'on':'off',ok?'Qualified':'Missed')),el('td',{class:'r num'},miss.length?String(missT):'—'),
+      el('td',{class:'r num'},!miss.length?'—':missT>0?'$0 (forfeited)':money(tg.gm*share)+' / '+money(tg.am*share))))}
+  // how-to
   const extra={sales:'Avg of weekly % vs LY. On track at goal +1 pt; at risk within 2 pts below goal.',txn:'Avg of weekly % vs LY. On track at goal +1 pt.',food:'Variance = actual food cost % − ideal %. If counts are complete but variance misses, BOTH food and count categories are lost.',labor:'Avg weekly labor %; must stay under goal. At risk within 0.5 pt of goal.',fan:'Checked monthly from the latest entry each month. Every month must qualify. Treat stores: 30 surveys.',deliv:'Delivery count vs last quarter, plus avg share of 4–5 star reviews.',truck:'Paid per month (1/3 each). Any missed count that month loses that month’s third.',dt:'Avg drive-thru time per order. At risk within 10 sec of the line.'};
   const dl=$('howto');dl.replaceChildren();
   for(const cr of CRIT)dl.append(el('dt',null,`${cr.name} — ${money(cr.gm)} GM / ${money(cr.am)} AM`),el('dd',null,RULES[cr.k](c)+'. '+extra[cr.k]));
   dl.append(el('dt',null,'Gates & deductions'),el('dd',null,`EcoSure failure forfeits all bonus. Store must have 2 AMs with P1, P2 & ServSafe (exceptions apply). Total shortages over ${money(c.shortMax)}, unapproved cash payouts and payouts without receipt are deducted.`));
 }
+$('storePick').addEventListener('change',e=>go('store',e.target.value));
 
-// ---------- history ----------
-function snapshot(sub,c){const R=evaluate(sub,c),P=payout(R);const blocked=c.eco==='fail'||c.certs==='no';
-  const sum=f=>sub.reduce((a,w)=>a+(isNum(w[f])?w[f]:0),0);const shortT=sum('short'),ded=(shortT>c.shortMax?shortT:0)+sum('payout')+sum('noReceipt');
-  return{R,gm:blocked?0:Math.max(0,P.gmOn-ded),am:blocked?0:P.amOn}}
+// ---------- history + charts ----------
 let lastHist=null;
-function renderHistory(c,ws){
-  const useAm=c.role==='am', snaps=ws.map((w,i)=>({w,...snapshot(ws.slice(0,i+1),c)}));
-  lastHist={c,ws,snaps,useAm};
-  $('histHead').replaceChildren(el('tr',null,el('th',null,'Week'),el('th',{class:'r'},'GM projected'),el('th',{class:'r'},'AM projected'),el('th',{class:'r'},'Change'),el('th',null,'Criteria (sales · food · labor · fan · trans · deliv · truck · DT)'),el('th',null,'Notes'),el('th',null,'')));
+function renderHistory(s,c,ws,useAm){
+  const snaps=ws.map((w,i)=>{const x=summarize(s,ws.slice(0,i+1));return{w,R:x.R,gm:x.gmLikely,am:x.amLikely}});
+  lastHist={c,snaps,useAm};
+  $('histHead').replaceChildren(el('tr',null,el('th',null,'Week'),el('th',{class:'r'},'GM projected'),el('th',{class:'r'},'AM projected'),el('th',{class:'r'},'Change'),el('th',null,'Criteria (sales · food · labor · fan · trans · deliv · truck · DT)'),el('th',null,'Action items')));
   const hb=$('histBody');hb.replaceChildren();
-  if(!snaps.length)hb.append(el('tr',null,el('td',{colspan:'7',class:'empty'},'No weeks saved for this quarter yet.')));
-  [...snaps].reverse().forEach((s,ri)=>{const i=snaps.length-1-ri,prev=snaps[i-1];
-    const cur=useAm?s.am:s.gm, d=prev?cur-(useAm?prev.am:prev.gm):null;
-    const btn=el('button',{class:'btn small',type:'button'},canWrite===false||!db?'View':'Open');btn.addEventListener('click',()=>openForm(s.w));
-    hb.append(el('tr',null,el('td',null,el('strong',null,'Wk '+(s.w.week??'?')),el('div',{class:'by'},s.w.date)),
-      el('td',{class:'r num'},money(s.gm)),el('td',{class:'r num'},money(s.am)),
-      el('td',{class:'r num '+(d==null?'':d>0?'up':d<0?'down':'')},d==null?'—':(d>0?'▲ +':d<0?'▼ −':'')+money(Math.abs(d)).replace('$','$')),
-      el('td',null,el('div',{class:'dots'},...CRIT.map(cr=>el('span',{class:'dot s-'+s.R[cr.k].s,title:cr.name+': '+({on:'on track',risk:'at risk',off:'missing',nodata:'no data'}[s.R[cr.k].s])})))),
-      el('td',{class:'note'},[s.w.actions&&('Action: '+s.w.actions),s.w.complaints&&('Complaints: '+s.w.complaints)].filter(Boolean).join(' · ')||'—'),
-      el('td',null,btn)))});
+  if(!snaps.length)hb.append(el('tr',null,el('td',{colspan:'6',class:'empty'},'No weeks saved for this quarter yet.')));
+  [...snaps].reverse().forEach((sn,ri)=>{const i=snaps.length-1-ri,prev=snaps[i-1],v=useAm?sn.am:sn.gm,d=prev?v-(useAm?prev.am:prev.gm):null;
+    hb.append(el('tr',null,el('td',null,el('strong',null,'Wk '+(sn.w.week??'?')),el('div',{class:'by'},sn.w.date)),
+      el('td',{class:'r num'},money(sn.gm)),el('td',{class:'r num'},money(sn.am)),
+      el('td',{class:'r num '+(d==null?'':d>0?'up':d<0?'down':'')},d==null?'—':(d>0?'▲ +':d<0?'▼ −':'')+money(Math.abs(d))),
+      el('td',null,el('div',{class:'dots'},...CRIT.map(cr=>el('span',{class:'dot s-'+sn.R[cr.k].s,title:cr.name+': '+({on:'on track',risk:'at risk',off:'missing',nodata:'no data'}[sn.R[cr.k].s])})))),
+      el('td',{class:'note'},sn.w.actions||'—')))});
   drawCharts();
 }
 const NS='http://www.w3.org/2000/svg';
 function sv(tag,a,txt){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e}
 function drawCharts(){
-  if(!lastHist)return;const {c,snaps,useAm}=lastHist;
+  if(!lastHist||view!=='store')return;const {c,snaps,useAm}=lastHist;
   $('chartBonusTitle').textContent='Projected '+(useAm?'AM':'GM')+' bonus after each week';
-  const host1=$('chartBonus'),host2=$('chartPct');
-  if(!snaps.length){host1.replaceChildren(el('div',{class:'empty'},'Add weeks to see the trend.'));host2.replaceChildren(el('div',{class:'empty'},'Add weeks to see the trend.'));return}
-  const W=Math.max(280,host1.clientWidth||320),H=190,L=52,Rr=12,T=14,B=26,iw=W-L-Rr,ih=H-T-B,n=snaps.length,step=iw/n;
-  // bonus bars
+  const h1=$('chartBonus'),h2=$('chartPct');
+  if(!snaps.length){h1.replaceChildren(el('div',{class:'empty'},'Add weeks to see the trend.'));h2.replaceChildren(el('div',{class:'empty'},'Add weeks to see the trend.'));return}
+  const W=Math.max(280,h1.clientWidth||320),H=190,L=52,Rr=14,T=14,B=26,iw=W-L-Rr,ih=H-T-B,n=snaps.length,step=iw/n;
   {const max=useAm?AM_MAX:GM_MAX,svg=sv('svg',{viewBox:`0 0 ${W} ${H}`,width:'100%',role:'img','aria-label':'Projected bonus by week'});
    for(let k=0;k<=4;k++){const v=max*k/4,y=T+ih-ih*k/4;svg.append(sv('line',{x1:L,x2:W-Rr,y1:y,y2:y,class:'grid'}),sv('text',{x:L-6,y:y+4,'text-anchor':'end'},'$'+Math.round(v).toLocaleString('en-US')))}
    const bw=Math.min(36,step*0.6);
    snaps.forEach((s,i)=>{const v=useAm?s.am:s.gm,h=ih*v/max,x=L+step*i+(step-bw)/2,y=T+ih-h;
-     svg.append(sv('rect',{x,y,width:bw,height:Math.max(h,1),rx:3,fill:'var(--ok)'}));
+     svg.append(sv('rect',{x,y,width:bw,height:Math.max(h,1),rx:3,style:'fill:var(--ok)'}));
      if(n<=8)svg.append(sv('text',{x:x+bw/2,y:Math.max(T+10,y-4),'text-anchor':'middle'},money(v)));
      if(n<=13||i%2===0)svg.append(sv('text',{x:x+bw/2,y:H-8,'text-anchor':'middle'},'W'+(s.w.week??'?')))});
-   host1.replaceChildren(svg)}
-  // pct lines
+   h1.replaceChildren(svg)}
   {const vals=snaps.flatMap(s=>[s.w.sales,s.w.txn]).filter(isNum).concat([c.salesGoal,c.txnGoal,0]);
    let lo=Math.min(...vals),hi=Math.max(...vals);const pad=Math.max(2,(hi-lo)*0.1);lo=Math.floor((lo-pad)/2)*2;hi=Math.ceil((hi+pad)/2)*2;
    const y=v=>T+ih-(v-lo)/(hi-lo)*ih,x=i=>L+step*i+step/2;
@@ -570,127 +726,108 @@ function drawCharts(){
    if(c.txnGoal!==c.salesGoal)svg.append(sv('line',{x1:L,x2:W-Rr,y1:y(c.txnGoal),y2:y(c.txnGoal),class:'goal'}));
    for(const [key,col] of [['sales','var(--accent)'],['txn','var(--warn)']]){
      const pts=snaps.map((s,i)=>isNum(s.w[key])?[x(i),y(s.w[key]),s.w[key]]:null).filter(Boolean);
-     if(pts.length>1)svg.append(sv('polyline',{points:pts.map(p=>p[0]+','+p[1]).join(' '),fill:'none',stroke:col,'stroke-width':2.5,'stroke-linejoin':'round'}));
-     pts.forEach((p,j)=>{svg.append(sv('circle',{cx:p[0],cy:p[1],r:j===pts.length-1?4.5:3,fill:col}));if(n<=8)svg.append(sv('text',{x:p[0]+(key==='sales'?-8:8),y:p[1]+4,'text-anchor':key==='sales'?'end':'start',style:'fill:'+col},(p[2]>0?'+':'')+p[2]+'%'))})}
+     if(pts.length>1)svg.append(sv('polyline',{points:pts.map(p=>p[0]+','+p[1]).join(' '),style:'fill:none;stroke:'+col,'stroke-width':2.5,'stroke-linejoin':'round'}));
+     pts.forEach((p,j)=>{svg.append(sv('circle',{cx:p[0],cy:p[1],r:j===pts.length-1?4.5:3,style:'fill:'+col}));if(n<=8)svg.append(sv('text',{x:p[0]+(key==='sales'?-8:8),y:p[1]+4,'text-anchor':key==='sales'?'end':'start',style:'fill:'+col},(p[2]>0?'+':'')+p[2]+'%'))})}
    snaps.forEach((s,i)=>{if(n<=13||i%2===0)svg.append(sv('text',{x:x(i),y:H-8,'text-anchor':'middle'},'W'+(s.w.week??'?')))});
-   host2.replaceChildren(svg)}
+   h2.replaceChildren(svg)}
 }
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(drawCharts,150)});
-
-// ---------- paths (private per signed-in person) ----------
-const LS_KEY='managerBonusTracker.v1';
-function loadAll(){try{const d=JSON.parse(localStorage.getItem(LS_KEY)||'{}');return d&&typeof d==='object'?d:{}}catch(e){return{}}}
-function saveAll(d){localStorage.setItem(LS_KEY,JSON.stringify(d))}
-function sync(){const d=loadAll();hasSettings=!!d.settings;const st=d.settings||{};S={...DEF,...st,label:TQ.label,start:TQ.start,end:TQ.end};if(st.gatesQ&&st.gatesQ!==TQ.start){S.eco='pending';S.certs='pending'}renderSetView();weeks=Object.entries(d.weeks||{}).map(([id,w])=>({id,...w}));fillSettings();render()}
-const storeDoc=()=>({set:async v=>{const d=loadAll();d.settings=v;saveAll(d);sync()}});
-const weekDoc=id=>({set:async v=>{const d=loadAll();d.weeks=d.weeks||{};d.weeks[id]=v;saveAll(d);sync()},delete:async()=>{const d=loadAll();if(d.weeks)delete d.weeks[id];saveAll(d);sync()}});
-function fileSave(name,text,type){const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 
 // ---------- weekly form ----------
 const NUMF={sales:'f_sales',txn:'f_txn',cakes:'f_cakes',cupcakes:'f_cupcakes',foodActual:'f_foodActual',foodTarget:'f_foodTarget',labor:'f_labor',fanCount:'f_fanCount',fanDma:'f_fanDma',deliv:'f_deliv',stars:'f_stars',truck:'f_truck',short:'f_short',payout:'f_payout',noReceipt:'f_noReceipt'};
 const triIn=v=>v===true?'yes':v===false?'no':'';
 const triOut=v=>v==='yes'?true:v==='no'?false:null;
-const numOut=v=>{if(v===''||v==null)return null;const n=Number(v);return isFinite(n)?n:null};
-function openForm(w){
-  editingId=w?w.id:null;delArmed=false;$('delBtn').textContent='Delete week';
-  const ro=canWrite===false||!db||!uid;
-  $('formTitle').textContent=w?(ro?'Week ':'Edit week ')+w.week:'New Thursday entry';
-  $('f_week').value=w?.week??'';$('f_date').value=w?.date??new Date().toISOString().slice(0,10);
+function openForm(w){editingId=w?w.id:null;delArmed=false;dupArmed=null;$('delBtn').textContent='Delete week';
+  const s=D.stores[cur];$('formTitle').textContent=(w?'Edit week '+w.week:'New Thursday entry')+(s?' — '+s.name:'');
+  $('f_week').value=w?.week??'';$('f_date').value=w?.date??TODAY;
   for(const[k,id]of Object.entries(NUMF))$(id).value=isNum(w?.[k])?w[k]:'';
   $('f_counts').value=triIn(w?.counts);$('f_fanQ').value=triIn(w?.fanQ);$('f_dt').value=isNum(w?.dt)?fmtDT(w.dt):'';
   $('f_complaints').value=w?.complaints||'';$('f_why').value=w?.why||'';$('f_actions').value=w?.actions||'';
-  for(const i of $('weekForm').querySelectorAll('input,select,textarea'))i.disabled=ro;
-  $('saveBtn').hidden=ro;$('delBtn').hidden=ro||!w;
-  $('formMsg').textContent='';
-  const p=$('entryPanel');p.open=true;p.scrollIntoView({behavior:'smooth',block:'start'});
-}
+  $('delBtn').hidden=!w;$('formMsg').textContent='';const p=$('entryPanel');p.open=true;p.scrollIntoView({behavior:'smooth',block:'start'})}
 $('newWeekBtn').addEventListener('click',()=>openForm(null));
 $('cancelBtn').addEventListener('click',()=>{$('entryPanel').open=false;editingId=null});
-$('delBtn').addEventListener('click',async()=>{
-  if(!editingId||!db||!uid)return;
-  if(!delArmed){delArmed=true;$('delBtn').textContent='Click again to delete';return}
-  try{await weekDoc(editingId).delete();$('formMsg').textContent='Deleted.';$('entryPanel').open=false;editingId=null}
-  catch(err){$('formMsg').textContent='Could not delete: '+(err&&err.message||'error')}
-});
-$('weekForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const week=numOut($('f_week').value), date=$('f_date').value;
-  if(!week||!date){$('formMsg').textContent='Enter the week number and meeting date.';return}
-  if(!db||!uid){$('formMsg').textContent='Saving is unavailable in this browser.';return}
-  const doc={week,date,counts:triOut($('f_counts').value),fanQ:triOut($('f_fanQ').value),dt:parseDT($('f_dt').value),complaints:$('f_complaints').value.trim(),why:$('f_why').value.trim(),actions:$('f_actions').value.trim(),at:new Date().toISOString()};
+$('delBtn').addEventListener('click',()=>{if(!editingId)return;if(!delArmed){delArmed=true;$('delBtn').textContent='Tap again to delete';return}
+  const id=editingId;if(mutate(d=>{delete d.weeks[id]})){$('entryPanel').open=false;editingId=null;render();showMsg('Week deleted.');setTimeout(()=>showMsg(''),2500)}});
+$('weekForm').addEventListener('submit',e=>{e.preventDefault();if(!cur)return;
+  const week=numOut($('f_week').value),date=$('f_date').value;if(!week||!date){$('formMsg').textContent='Enter the week number and meeting date.';return}
+  const doc={storeId:cur,week,date,counts:triOut($('f_counts').value),fanQ:triOut($('f_fanQ').value),dt:parseDT($('f_dt').value),complaints:$('f_complaints').value.trim(),why:$('f_why').value.trim(),actions:$('f_actions').value.trim(),at:new Date().toISOString()};
   for(const[k,id]of Object.entries(NUMF))doc[k]=numOut($(id).value);
-  const id=editingId||(date.slice(0,4)+'-w'+String(week).padStart(2,'0'));
-  $('saveBtn').disabled=true;$('formMsg').textContent='Saving…';
-  try{
-    if(!hasSettings){await storeDoc().set({...S});hasSettings=true}
-    await weekDoc(id).set(doc);$('formMsg').textContent='Saved.';editingId=null;$('entryPanel').open=false}
-  catch(err){$('formMsg').textContent='Could not save on this device. Private/incognito mode or full storage can block saving.'}
-  finally{$('saveBtn').disabled=false}
-});
+  const newId=cur+'--'+date.slice(0,4)+'-w'+String(week).padStart(2,'0');
+  load();
+  if(newId!==editingId&&D.weeks[newId]&&dupArmed!==newId){dupArmed=newId;$('formMsg').textContent='Week '+week+' is already saved for this store. Tap Save again to replace it.';return}
+  dupArmed=null;const old=editingId;
+  if(mutate(d=>{if(old&&old!==newId)delete d.weeks[old];d.weeks[newId]=doc})){$('entryPanel').open=false;editingId=null;const q=quarterOf(date);viewQ=q.start===TQ.start?null:q;render();showMsg('Saved week '+week+'.');setTimeout(()=>showMsg(''),2500)}});
 
-// ---------- my store & goals ----------
-function fillSettings(){
-  $('s_store').value=S.store||'';$('s_role').value=S.role||'gm';$('s_labor').value=isNum(S.laborGoal)?S.laborGoal:'';$('s_treat').checked=!!S.treat;
-  $('s_eco').value=S.eco;$('s_certs').value=S.certs;
-  $('s_name').value=S.name||'';
-  $('s_sales').value=S.salesGoal;$('s_txn').value=S.txnGoal;$('s_food').value=S.foodMax;$('s_dt').value=fmtDT(S.dtGoal);
-  $('s_fanDma').value=S.fanDma;$('s_deliv').value=S.delivGoal;$('s_stars').value=S.starGoal;$('s_shortMax').value=S.shortMax;
+// ---------- SETUP ----------
+function dlItems(host,items){host.replaceChildren(...items.map(([k,v])=>el('div',null,el('dt',null,k),el('dd',null,v))))}
+function renderSetup(stores){
+  $('welcome').hidden=!!stores.length;
+  dlItems($('profView'),[['Name',D.profile.name||'—'],['Role',ROLE_T[D.profile.role]||'—']]);
+  const g=D.goals;
+  dlItems($('goalView'),[['Sales','+'+g.salesGoal+'% vs LY'],['Transactions','+'+g.txnGoal+'% vs LY'],['Food cost variance','0 to +'+g.foodMax+' pts'],['Drive-thru',fmtDT(g.dtGoal)+' or faster'],['Fan score','+'+g.fanDma+' vs DMA'],['Deliveries','+'+g.delivGoal+'%, '+g.starGoal+'% 4–5★'],['Shortage limit',money(g.shortMax)]]);
+  const L=$('storeList');L.replaceChildren();
+  if(!stores.length)L.append(el('div',{class:'muted'},'No stores yet. Add the store(s) you run.'));
+  for(const s of stores){const gq=!s.gatesQ||s.gatesQ===TQ.start;
+    const b=el('button',{class:'btn small',type:'button'},'Edit');b.addEventListener('click',()=>editStore(s));
+    const o=el('button',{class:'btn small',type:'button'},'Open');o.addEventListener('click',()=>go('store',s.id));
+    L.append(el('div',{class:'storeitem'},el('div',null,el('strong',null,s.name),el('div',{class:'by'},[s.gm&&('GM: '+s.gm),isNum(s.laborGoal)?'labor under '+s.laborGoal+'%':'labor goal not set',s.treat?'treat store':null,'EcoSure '+(gq?s.eco||'pending':'pending'),'AM certs '+(gq?s.certs||'pending':'pending')].filter(Boolean).join(' · '))),el('div',{class:'row'},o,b)))}
+  if(!stores.length&&$('storeForm').hidden)editStore(null);
 }
-$('setForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  if(!db||!uid){$('setMsg').textContent='Saving is unavailable in this browser.';return}
-  const n=(id,d)=>{const v=numOut($(id).value);return v==null?d:v};
-  const next={store:$('s_store').value.trim(),name:$('s_name').value.trim(),gatesQ:TQ.start,role:$('s_role').value,laborGoal:numOut($('s_labor').value),treat:$('s_treat').checked,eco:$('s_eco').value,certs:$('s_certs').value,
-    salesGoal:n('s_sales',DEF.salesGoal),txnGoal:n('s_txn',DEF.txnGoal),foodMax:n('s_food',DEF.foodMax),dtGoal:parseDT($('s_dt').value)??DEF.dtGoal,
-    fanDma:n('s_fanDma',DEF.fanDma),delivGoal:n('s_deliv',DEF.delivGoal),starGoal:n('s_stars',DEF.starGoal),shortMax:n('s_shortMax',DEF.shortMax)};
-  $('setMsg').textContent='Saving…';
-  if(!next.store){$('setMsg').textContent='Enter your store name.';$('s_store').focus();return}
-  try{editingSet=false;await storeDoc().set(next);$('setMsg').textContent='';$('setViewMsg').textContent='Saved.'}
-  catch(err){$('setMsg').textContent='Could not save on this device. Private/incognito mode or full storage can block saving.'}
-});
-function renderSetView(){
-  const locked=hasSettings&&!editingSet;
-  $('setView').hidden=!locked;$('setForm').hidden=locked;$('setCancel').hidden=!hasSettings;
-  if(!locked)return;
-  const roleT=S.role==='am'?'Assistant manager':'General manager';
-  const gate={pass:'Passed',fail:'Failed',pending:'Pending'}[S.eco]||'Pending', cert={yes:'Yes',exception:'Exception',no:'No',pending:'Not confirmed'}[S.certs]||'Not confirmed';
-  const items=[['Store',S.store||'—'],['Name',S.name||'—'],['Role',roleT],['Labor goal',isNum(S.laborGoal)?'Under '+S.laborGoal+'%':'Not set'],['Treat store',S.treat?'Yes (30 surveys)':'No (35 surveys)'],['Quarter',S.label],['EcoSure',gate],['2 certified AMs',cert],
-    ['Sales goal','+'+S.salesGoal+'% vs LY'],['Transactions goal','+'+S.txnGoal+'% vs LY'],['Food cost variance','0 to +'+S.foodMax+' pts'],['Drive-thru',fmtDT(S.dtGoal)+' or faster'],['Fan score','+'+S.fanDma+' vs DMA'],['Deliveries','+'+S.delivGoal+'%, '+S.starGoal+'% 4–5★'],['Shortage limit',money(S.shortMax)]];
-  $('setSummary').replaceChildren(...items.map(([k,v])=>el('div',null,el('dt',null,k),el('dd',null,v))));
-}
-function startEditSettings(){editingSet=true;fillSettings();renderSetView();$('setViewMsg').textContent='';const p=$('setPanel');p.open=true;p.scrollIntoView({behavior:'smooth',block:'start'});$('s_store').focus()}
-$('editSetBtn').addEventListener('click',startEditSettings);
-$('setCancel').addEventListener('click',()=>{editingSet=false;fillSettings();renderSetView();$('setMsg').textContent=''});
-$('setupBtn').addEventListener('click',startEditSettings);
-
-// ---------- CSV ----------
-$('csvBtn').addEventListener('click',async()=>{
-  if(!downloads)return;
-  const cols=['week','date','sales','txn','cakes','cupcakes','counts','foodActual','foodTarget','labor','dt','fanQ','fanCount','fanDma','deliv','stars','truck','short','payout','noReceipt','complaints','why','actions'];
-  const esc=v=>{if(v==null)return'';const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
-  const rows=[cols.join(',')].concat([...weeks].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(w=>cols.map(c=>c==='dt'?esc(isNum(w.dt)?fmtDT(w.dt):''):esc(w[c])).join(',')));
-  const name=((S.store||'my-store')+'-'+(S.label||'quarter')).replace(/[^A-Za-z0-9]+/g,'-')+'.csv';
-  try{await downloads.save({filename:name,data:rows.join('\n')})}catch(e){}
-});
-
-// ---------- backup / restore ----------
-$('backupBtn').addEventListener('click',()=>{const d=loadAll();d.exportedAt=new Date().toISOString();const name=('bonus-backup-'+(S.store||'my-store')+'-'+new Date().toISOString().slice(0,10)).replace(/[^A-Za-z0-9-]+/g,'-')+'.json';fileSave(name,JSON.stringify(d,null,2),'application/json')});
+// profile
+$('profEdit').addEventListener('click',()=>{$('p_name').value=D.profile.name||'';$('p_role').value=D.profile.role||'om';$('profForm').hidden=false;$('profBtns').hidden=true;$('profView').hidden=true});
+$('profCancel').addEventListener('click',()=>{$('profForm').hidden=true;$('profBtns').hidden=false;$('profView').hidden=false});
+$('profForm').addEventListener('submit',e=>{e.preventDefault();const prof={name:$('p_name').value.trim(),role:$('p_role').value};if(mutate(d=>{d.profile=prof})){$('profForm').hidden=true;$('profBtns').hidden=false;$('profView').hidden=false;render()}});
+// goals
+$('goalEdit').addEventListener('click',()=>{const g=D.goals;$('g_sales').value=g.salesGoal;$('g_txn').value=g.txnGoal;$('g_food').value=g.foodMax;$('g_dt').value=fmtDT(g.dtGoal);$('g_fanDma').value=g.fanDma;$('g_deliv').value=g.delivGoal;$('g_stars').value=g.starGoal;$('g_shortMax').value=g.shortMax;$('goalForm').hidden=false;$('goalBtns').hidden=true;$('goalView').hidden=true});
+$('goalCancel').addEventListener('click',()=>{$('goalForm').hidden=true;$('goalBtns').hidden=false;$('goalView').hidden=false});
+$('goalForm').addEventListener('submit',e=>{e.preventDefault();const n=(id,d)=>{const v=numOut($(id).value);return v==null?d:v};
+  const goals={salesGoal:n('g_sales',6),txnGoal:n('g_txn',2),foodMax:n('g_food',2.5),dtGoal:parseDT($('g_dt').value)??240,fanDma:n('g_fanDma',2),delivGoal:n('g_deliv',10),starGoal:n('g_stars',85),shortMax:n('g_shortMax',180)};
+  if(mutate(d=>{d.goals=goals})){$('goalForm').hidden=true;$('goalBtns').hidden=false;$('goalView').hidden=false;render()}});
+// stores
+function editStore(s){editingStore=s?s.id:null;storeDelArmed=false;$('storeDel').textContent='Remove store';
+  const gq=s&&(!s.gatesQ||s.gatesQ===TQ.start);
+  $('st_name').value=s?.name||'';$('st_gm').value=s?.gm||'';$('st_labor').value=isNum(s?.laborGoal)?s.laborGoal:'';$('st_treat').checked=!!s?.treat;
+  $('st_eco').value=gq?s.eco||'pending':'pending';$('st_certs').value=gq?s.certs||'pending':'pending';
+  $('storeFormTitle').textContent=s?'Edit '+s.name:'Add a store';$('storeDel').hidden=!s;$('storeCancel').hidden=!storeList().length;$('storeMsg').textContent='';
+  $('storeForm').hidden=false;$('storeAdd').hidden=true;$('st_name').focus()}
+function closeStoreForm(){$('storeForm').hidden=true;$('storeAdd').hidden=false;editingStore=null}
+$('storeAdd').addEventListener('click',()=>editStore(null));
+$('storeCancel').addEventListener('click',closeStoreForm);
+$('storeDel').addEventListener('click',()=>{if(!editingStore)return;const n=weekList().filter(w=>w.storeId===editingStore).length;
+  if(!storeDelArmed){storeDelArmed=true;$('storeDel').textContent='Tap again — deletes '+n+' saved week'+(n===1?'':'s');return}
+  const sid=editingStore;if(mutate(d=>{delete d.stores[sid];for(const k of Object.keys(d.weeks))if(d.weeks[k].storeId===sid)delete d.weeks[k]})){closeStoreForm();render()}});
+$('storeForm').addEventListener('submit',e=>{e.preventDefault();const name=$('st_name').value.trim();if(!name){$('storeMsg').textContent='Enter a store name.';return}
+  load();let id=editingStore;if(!id){const base='s-'+(name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'store');id=base;let i=2;while(D.stores[id])id=base+'-'+i++}
+  const rec={name,gm:$('st_gm').value.trim(),laborGoal:numOut($('st_labor').value),treat:$('st_treat').checked,eco:$('st_eco').value,certs:$('st_certs').value,gatesQ:TQ.start};
+  if(mutate(d=>{d.stores[id]=rec})){const first=storeList().length===1;closeStoreForm();if(first){cur=id}render();showMsg('Saved '+name+'.'+(first?' Open “My store” to add your first Thursday numbers.':''));setTimeout(()=>showMsg(''),4000)}});
+// data
+$('backupBtn').addEventListener('click',()=>{mutate(d=>{d.lastBackup=TODAY});const name=('performance-tracker-backup-'+TODAY).replace(/[^A-Za-z0-9-]+/g,'-')+'.json';fileSave(name,JSON.stringify({...D,exportedAt:new Date().toISOString(),app:'dq-performance-tracker',version:2},null,2),'application/json')});
 $('restoreBtn').addEventListener('click',()=>$('restoreFile').click());
-$('restoreFile').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const b=$('dbBanner');b.hidden=false;
-  try{const inc=JSON.parse(await f.text());if(!inc||typeof inc!=='object'||(!inc.weeks&&!inc.settings))throw new Error('not a tracker backup');
-    const d=loadAll();d.weeks={...(d.weeks||{}),...(inc.weeks||{})};if(inc.settings)d.settings=inc.settings;saveAll(d);sync();
-    b.textContent='Restored '+Object.keys(inc.weeks||{}).length+' week(s) from '+f.name+'.'}
-  catch(err){b.textContent='Could not restore: '+(err&&err.message||'unreadable file')+'. Pick a .json file made with Backup.'}
+$('restoreFile').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;
+  try{let inc=JSON.parse(await f.text());if(!inc||typeof inc!=='object')throw new Error('not a tracker backup');
+    if(inc.settings&&!inc.stores){const s=inc.settings,sid='store-1';inc={profile:{name:s.name||'',role:s.role||'gm'},goals:pick(s,Object.keys(DEFGOALS)),stores:{[sid]:{name:s.store||'My store',gm:s.name||'',laborGoal:s.laborGoal??null,treat:!!s.treat,eco:s.eco||'pending',certs:s.certs||'pending',gatesQ:s.gatesQ||TQ.start}},weeks:Object.fromEntries(Object.entries(inc.weeks||{}).map(([id,w])=>[sid+'--'+id,{...w,storeId:sid}]))}}
+    if(!inc.stores&&!inc.weeks)throw new Error('not a tracker backup');
+    for(const w of Object.values(inc.weeks||{}))if(!w||typeof w!=='object'||!w.storeId||!w.date)throw new Error('backup has invalid week rows');
+    if(mutate(d=>{d.stores={...d.stores,...(inc.stores||{})};d.weeks={...d.weeks,...(inc.weeks||{})};if(inc.goals)d.goals={...DEFGOALS,...inc.goals};if(inc.profile)d.profile={...d.profile,...inc.profile}})){closeStoreForm();render();showMsg('Restored '+Object.keys(inc.stores||{}).length+' store(s) and '+Object.keys(inc.weeks||{}).length+' week(s) from '+f.name+'.')}}
+  catch(err){showMsg('Could not restore: '+(err&&err.message||'unreadable file')+'. Pick a .json file made with Backup.')}
   e.target.value=''});
+$('csvBtn').addEventListener('click',()=>{const cols=['store','week','date','sales','txn','cakes','cupcakes','counts','foodActual','foodTarget','labor','dt','fanQ','fanCount','fanDma','deliv','stars','truck','short','payout','noReceipt','complaints','why','actions'];
+  const esc=v=>{if(v==null)return'';const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
+  const rows=[cols.join(',')].concat(weekList().sort((a,b)=>(a.storeId||'').localeCompare(b.storeId||'')||(a.date||'').localeCompare(b.date||'')).map(w=>cols.map(c=>c==='store'?esc((D.stores[w.storeId]||{}).name||w.storeId):c==='dt'?esc(isNum(w.dt)?fmtDT(w.dt):''):esc(w[c])).join(',')));
+  fileSave('performance-tracker-weeks-'+TODAY+'.csv',rows.join('\n'),'text/csv')});
 
-// ---------- boot ----------
-db=true;uid='local';canWrite=true;
-downloads={save:async({filename,data})=>fileSave(filename,data,'text/csv')};
-try{localStorage.setItem(LS_KEY+'.probe','1');localStorage.removeItem(LS_KEY+'.probe')}catch(e){const b=$('dbBanner');b.hidden=false;b.textContent='This browser is blocking storage (private/incognito mode?). Open in a normal window so your numbers are saved.'}
-try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-window.addEventListener('storage',e=>{if(e.key===LS_KEY)sync()});
-sync();
+// ================= boot =================
+try{localStorage.setItem(KEY+'.probe','1');localStorage.removeItem(KEY+'.probe')}catch(e){showMsg('This browser is blocking storage (private/incognito mode?). Open in a normal window so your numbers are saved.')}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist().catch(()=>{})}catch(e){}
+window.addEventListener('storage',e=>{if(e.key===KEY){load();render()}});
+load();
+if(loadError)showMsg('Saved data on this device could not be read. A copy was kept; use Restore with your latest backup file.');
+else if(weekList().length){const days=D.lastBackup?Math.round((new Date(TODAY)-new Date(D.lastBackup))/864e5):null;
+  if(days==null||days>30)showMsg((days==null?'No backup yet.':'Last backup '+days+' days ago.')+' Go to Setup → Backup to keep a copy of your numbers.')}
+view=storeList().length>1?'overview':'store';
+readHash();
 })();
+
 </script>
 </body>
 </html>
