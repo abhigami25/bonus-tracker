@@ -133,7 +133,9 @@ textarea{min-height:58px;resize:vertical}
 .screen{display:flex;flex-direction:column;gap:22px}
 .tabs{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
 .tabs-in{max-width:1200px;margin:0 auto;display:flex;gap:6px;align-items:center;overflow-x:auto;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.brand{font-family:var(--f-display);font-weight:700;font-size:1.15rem;margin-right:auto;white-space:nowrap;padding-right:8px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:1.15rem;white-space:nowrap;padding-right:8px}
+.syncchip{margin-right:auto;font:inherit;font-size:.74rem;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel);color:var(--muted);cursor:pointer;white-space:nowrap}
+.sc-synced{color:var(--ok);border-color:var(--ok)}.sc-saving,.sc-loading,.sc-connecting{color:var(--warn);border-color:var(--warn)}.sc-error{color:var(--bad);border-color:var(--bad)}
 .tab{font:inherit;font-weight:600;font-size:.88rem;border:1px solid transparent;background:transparent;color:var(--muted);padding:7px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
 .tab:hover{color:var(--ink)}
 .tab.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
@@ -143,13 +145,14 @@ textarea{min-height:58px;resize:vertical}
 .formgrid .wide{grid-column:1/-1}
 .pillbtn{border:0;cursor:pointer;font:inherit;font-size:.78rem;font-weight:600}
 .foot{text-align:center;padding-top:10px}
-@media (max-width:560px){.brand{display:none}.tabs-in{justify-content:space-between}.tab{flex:1}}
+@media (max-width:560px){.brand{display:none}.tabs-in{flex-wrap:wrap;justify-content:space-between}.syncchip{order:-1;flex-basis:100%;margin:0 0 4px;text-align:center}.tab{flex:1}}
 </style>
 </head>
 <body>
 <nav class="tabs" aria-label="Screens">
   <div class="tabs-in">
     <span class="brand">Performance Tracker</span>
+    <button type="button" class="syncchip sc-off" id="syncChip" title="Sync status">This device only</button>
     <button type="button" class="tab" id="tabOverview" data-view="overview">All stores</button>
     <button type="button" class="tab" id="tabStore" data-view="store">My store</button>
     <button type="button" class="tab" id="tabSetup" data-view="setup">Setup</button>
@@ -193,7 +196,7 @@ textarea{min-height:58px;resize:vertical}
     <section class="block" aria-labelledby="h-ovweek">
       <div><h2 id="h-ovweek">Latest week by store</h2><div class="muted small">Each store's most recent Thursday entry.</div></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Store</th><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Labor</th><th class="r">DT time</th><th>Counts</th><th>Fan</th><th>Action items</th></tr></thead>
+        <thead><tr><th>Store</th><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Labor</th><th class="r">DT time</th><th>Counts</th><th>Fan vs DMA</th><th class="r">Deduct</th><th>Action items</th></tr></thead>
         <tbody id="ovWeekBody"></tbody>
       </table></div>
     </section>
@@ -266,31 +269,34 @@ textarea{min-height:58px;resize:vertical}
           <label>Cupcakes (+/- vs LY units)<input id="f_cupcakes" type="number" step="1" placeholder="e.g. 16"></label>
         </fieldset>
         <fieldset>
-          <legend>Food cost, labor, speed</legend>
+          <legend>Counts, labor, speed</legend>
           <label>Daily counts &amp; waste 100% complete?<select id="f_counts"><option value="">Not reported</option><option value="yes">Yes — clear</option><option value="no">No — missed entries</option></select></label>
-          <label>Food cost actual %<input id="f_foodActual" type="number" step="any"></label>
-          <label>Food cost target (ideal) %<input id="f_foodTarget" type="number" step="any"></label>
           <label>Labor %<input id="f_labor" type="number" step="any" placeholder="e.g. 24.40"></label>
           <label>Drive-thru time (m:ss)<input id="f_dt" type="text" inputmode="decimal" placeholder="3:59"></label>
         </fieldset>
         <fieldset>
-          <legend>Guests &amp; deliveries</legend>
-          <label>Fan feedback qualifies?<select id="f_fanQ"><option value="">Not reported</option><option value="yes">Yes</option><option value="no">No</option></select></label>
-          <label>Fan surveys month to date<input id="f_fanCount" type="number" step="1"></label>
-          <label>Fan score vs DMA (pts)<input id="f_fanDma" type="number" step="any"></label>
+          <legend>Fan score &amp; deliveries</legend>
+          <label>Fan score — store actual<input id="f_fanActual" type="number" step="any" placeholder="e.g. 88.5"></label>
+          <label>Fan score — DMA this week<input id="f_fanDmaScore" type="number" step="any" placeholder="e.g. 86.0"></label>
           <label>Deliveries % vs last quarter<input id="f_deliv" type="number" step="any"></label>
-          <label>Delivery 4–5 star %<input id="f_stars" type="number" step="any"></label>
           <label>Truck counts missed this week<input id="f_truck" type="number" step="1" min="0"></label>
+          <div class="wide muted small" id="fanHint">Store actual must be 2+ points above DMA to qualify.</div>
         </fieldset>
         <fieldset>
-          <legend>Cash &amp; deductions</legend>
-          <label>Cash shortage $<input id="f_short" type="number" step="any" min="0"></label>
-          <label>Unapproved cash payouts $<input id="f_payout" type="number" step="any" min="0"></label>
-          <label>Payouts without receipt $<input id="f_noReceipt" type="number" step="any" min="0"></label>
+          <legend>Deductions (counts this week)</legend>
+          <label>Receipt uploads missed on Drive<input id="f_missedReceipts" type="number" step="1" min="0" placeholder="0"></label>
+          <label>Missed clock-outs<input id="f_missedClock" type="number" step="1" min="0" placeholder="0"></label>
+          <div class="wide muted small" id="dedHint">Each one takes $50 off the bonus.</div>
+        </fieldset>
+        <fieldset>
+          <legend>Monthly COGS — enter once a month</legend>
+          <label>COGS actual %<input id="f_foodActual" type="number" step="any"></label>
+          <label>COGS target %<input id="f_foodTarget" type="number" step="any"></label>
+          <div class="wide muted small" id="cogsHint">Leave blank on other weeks. The latest COGS entered in a month counts for that month.</div>
         </fieldset>
         <fieldset>
           <legend>Discussion</legend>
-          <label class="wide">Customer complaints<textarea id="f_complaints" placeholder="Refund, Google review…"></textarea></label>
+          <label class="wide">Customer complaints &amp; reviews<textarea id="f_complaints" placeholder="Refund, Google review…"></textarea></label>
           <label class="wide">Why not satisfied<textarea id="f_why"></textarea></label>
           <label class="wide">Action items for next Thursday<textarea id="f_actions"></textarea></label>
         </fieldset>
@@ -318,7 +324,7 @@ textarea{min-height:58px;resize:vertical}
     <section class="block" aria-labelledby="h-weeks">
       <h2 id="h-weeks">Weekly log</h2>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Cakes</th><th class="r">Cupcakes</th><th>Counts/waste</th><th class="r">Food var</th><th class="r">Labor</th><th class="r">DT time</th><th>Fan fdbk</th><th class="r">Truck miss</th><th>Notes</th><th></th></tr></thead>
+        <thead><tr><th>Week</th><th class="r">Sales vs LY</th><th class="r">Trans vs LY</th><th class="r">Cakes</th><th class="r">Cupcakes</th><th>Counts/waste</th><th class="r">COGS var</th><th class="r">Labor</th><th class="r">DT time</th><th>Fan vs DMA</th><th class="r">Truck miss</th><th class="r">Deduct</th><th>Notes</th><th></th></tr></thead>
         <tbody id="weekBody"></tbody>
       </table></div>
     </section>
@@ -326,7 +332,7 @@ textarea{min-height:58px;resize:vertical}
     <section class="block" aria-labelledby="h-month">
       <h2 id="h-month">Monthly roll-up</h2>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Month</th><th class="r">Weeks</th><th class="r">Avg sales vs LY</th><th class="r">Avg trans vs LY</th><th class="r">Avg food var</th><th class="r">Avg labor</th><th class="r">Avg DT</th><th>Fan fdbk</th><th class="r">Truck misses</th><th class="r">Truck $ GM / AM</th></tr></thead>
+        <thead><tr><th>Month</th><th class="r">Weeks</th><th class="r">Avg sales vs LY</th><th class="r">Avg trans vs LY</th><th class="r">COGS var</th><th class="r">Avg labor</th><th class="r">Avg DT</th><th>Fan vs DMA</th><th class="r">Truck misses</th><th class="r">Truck $ GM / AM</th><th class="r">Deductions</th></tr></thead>
         <tbody id="monthBody"></tbody>
       </table></div>
     </section>
@@ -383,20 +389,36 @@ textarea{min-height:58px;resize:vertical}
       <form id="goalForm" class="formgrid" novalidate hidden>
         <label>Sales goal % vs LY<input id="g_sales" type="number" step="any"></label>
         <label>Transactions goal % vs LY<input id="g_txn" type="number" step="any"></label>
-        <label>Food cost max variance (pts)<input id="g_food" type="number" step="any"></label>
+        <label>COGS max variance (pts, monthly)<input id="g_food" type="number" step="any"></label>
         <label>Drive-thru goal (m:ss)<input id="g_dt" type="text" placeholder="4:00"></label>
-        <label>Fan score above DMA (pts)<input id="g_fanDma" type="number" step="any"></label>
+        <label>Fan score above store DMA (pts)<input id="g_fanDma" type="number" step="any"></label>
         <label>Deliveries goal % vs last qtr<input id="g_deliv" type="number" step="any"></label>
-        <label>Delivery 4–5 star min %<input id="g_stars" type="number" step="any"></label>
-        <label>Shortage threshold $<input id="g_shortMax" type="number" step="any"></label>
+        <label>$ off per missed receipt upload<input id="g_rcpt" type="number" step="any" min="0"></label>
+        <label>$ off per missed clock-out<input id="g_clock" type="number" step="any" min="0"></label>
+        <label>Deductions come out of<select id="g_dedTo"><option value="gm">GM bonus</option><option value="both">GM and each AM bonus</option></select></label>
         <div class="row wide"><button class="btn primary" type="submit">Save goals</button><button class="btn" type="button" id="goalCancel">Cancel</button></div>
       </form>
       <div class="row" id="goalBtns"><button class="btn" type="button" id="goalEdit">Change goals</button></div>
     </section>
 
+    <section class="panel block pad" aria-labelledby="h-sync">
+      <h2 id="h-sync">Sync across devices</h2>
+      <div id="syncOff" class="muted small">Cloud sync is not turned on in this copy of the app yet. The person who published the app adds the free Firebase settings once (see the README). Until then, numbers stay on this device.</div>
+      <div id="syncAuth" hidden>
+        <div class="muted small">Sign in with the same email on your phone and laptop to see the same numbers everywhere. First time here? Enter an email and a password (6+ characters) and tap Create account.</div>
+        <div class="formgrid" style="margin-top:10px">
+          <label>Email<input id="syncEmail" type="email" autocomplete="username" inputmode="email"></label>
+          <label>Password<input id="syncPass" type="password" autocomplete="current-password" minlength="6"></label>
+          <div class="row wide"><button class="btn primary" type="button" id="syncSignIn">Sign in</button><button class="btn" type="button" id="syncSignUp">Create account</button><button class="btn" type="button" id="syncReset">Forgot password</button><span class="msg" id="syncMsg" role="status"></span></div>
+        </div>
+      </div>
+      <div id="syncIn" class="row" hidden><span>Signed in as <strong id="syncWho"></strong></span><button class="btn" type="button" id="syncSignOut">Sign out</button></div>
+      <div class="banner" id="syncErr" hidden></div>
+    </section>
+
     <section class="panel block pad" aria-labelledby="h-data">
       <h2 id="h-data">Your data</h2>
-      <div class="muted small">Everything is saved in this browser on this device — nothing is sent anywhere. Clearing browser data or private mode erases it. Back up monthly and keep the file in email or cloud storage.</div>
+      <div class="muted small" id="privNoteData">Right now your numbers are saved only in this browser on this device.</div>
       <div class="row">
         <button class="btn" id="backupBtn" type="button">Backup (.json)</button>
         <button class="btn" id="restoreBtn" type="button">Restore from backup</button>
@@ -410,12 +432,19 @@ textarea{min-height:58px;resize:vertical}
 </div>
 
 <script>
+/* ===== CLOUD SYNC SETTINGS =====
+   Paste your Firebase web config here to turn on sync across devices (see README).
+   Example: window.TRACKER_FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", projectId: "...", appId: "..." };
+*/
+window.TRACKER_FIREBASE_CONFIG = null;
+</script>
+<script>
 (function(){
 "use strict";
 // ================= bonus rules (from Quarter bonus sheet) =================
 const CRIT=[
  {k:'sales',name:'Sales vs last year',short:'Sales',gm:750,am:200},
- {k:'food',name:'Food cost & daily count/waste entries',short:'Food',gm:500,am:200},
+ {k:'food',name:'COGS & daily count/waste entries',short:'COGS',gm:500,am:200},
  {k:'labor',name:'Labor cost',short:'Labor',gm:500,am:200},
  {k:'fan',name:'Fan feedback',short:'Fan',gm:500,am:100},
  {k:'txn',name:'Transaction count vs last year',short:'Trans',gm:500,am:150},
@@ -424,24 +453,24 @@ const CRIT=[
  {k:'dt',name:'Drive-thru speed',short:'DT',gm:500,am:100}
 ];
 const GM_MAX=CRIT.reduce((a,c)=>a+c.gm,0), AM_MAX=CRIT.reduce((a,c)=>a+c.am,0);
-const DEFGOALS={salesGoal:6,txnGoal:2,foodMax:2.5,dtGoal:240,fanDma:2,delivGoal:10,starGoal:85,shortMax:180};
+const DEFGOALS={salesGoal:6,txnGoal:2,foodMax:2.5,dtGoal:240,fanDma:2,delivGoal:10,rcptPenalty:50,clockPenalty:50,dedTo:'gm'};
 const TIPS={
  sales:['Push cake & cupcake pre-orders at the register and on the board','Suggest a size-up or add-on on every order','Keep the current promo visible at the menu board and window'],
  txn:['Drive-thru speed drives repeat visits — protect the 4-min line','Promote app/online deals to pull extra visits','Staff slow dayparts with strongest closers'],
- food:['Do counts and waste entries every day — one missed day forfeits','Compare actual vs ideal weekly; dig into any item >0.5 pt off','Portion with scales/scoops; log every throw-away'],
+ food:['Do counts and waste entries every day — one missed day forfeits','Check COGS vs target mid-month; dig into any item >0.5 pt off','Portion with scales/scoops; log every throw-away'],
  labor:['Schedule to forecast hourly sales, not habit','Cut early when sales trail forecast','Review overtime every Thursday'],
- fan:['Ask every guest to fill the receipt survey','Hit the monthly survey minimum early in the month','Follow up same day on any low score'],
- deliv:['Double-check bag accuracy before handoff','Pack cold items separately and sealed','Respond to every delivery review'],
+ fan:['Ask every guest to fill the receipt survey','Watch the store score vs DMA every Thursday — DMA moves weekly','Follow up same day on any low score'],
+ deliv:['Keep delivery apps open all hours the store is open','Double-check bag accuracy before handoff','Respond to every delivery review'],
  truck:['Count every truck, including Hiland — one miss forfeits the month','Assign a named owner per delivery day','Photo the signed count sheet'],
  dt:['Strongest crew on window and expo at peak','Pre-stage cups, lids and toppings before rush','Watch the timer live; call out orders over 4 minutes']
 };
 const RULES={
  sales:c=>`Up ${c.salesGoal}% or more vs last year`,
  txn:c=>`Up ${c.txnGoal}% or more vs last year, same period`,
- food:c=>`Actual vs ideal 0 to +${c.foodMax} pts AND 100% daily counts/waste entries`,
+ food:c=>`COGS actual vs target 0 to +${c.foodMax} pts each month AND 100% daily counts/waste entries`,
  labor:c=>isNum(c.laborGoal)?`Under ${c.laborGoal}%`:'Under goal % (set it for this store in Setup)',
- fan:c=>`At least ${c.fanMin} surveys every month, ${c.fanDma}% above DMA`,
- deliv:c=>`Up ${c.delivGoal}% vs last quarter, avg ${c.starGoal}% 4–5 star`,
+ fan:c=>`Store fan score ${c.fanDma}+ pts above store DMA, every month (DMA changes weekly)`,
+ deliv:c=>`Deliveries up ${c.delivGoal}% vs last quarter`,
  truck:()=>'Count every truck. 1 missed count forfeits that month (1/3 of this bonus)',
  dt:c=>`${fmtDT(c.dtGoal)} or faster per order`
 };
@@ -466,6 +495,11 @@ const monthKey=d=>d.slice(0,7);
 function qMonths(c){const out=[];let [y,m]=c.start.split('-').map(Number);const [ey,em]=c.end.split('-').map(Number);let g=0;while((y<ey||(y===ey&&m<=em))&&g++<24){out.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++}}return out}
 function monthName(k){const [y,m]=k.split('-').map(Number);return new Date(y,m-1,1).toLocaleString('en-US',{month:'short',year:'numeric'})}
 function foodVar(w){return isNum(w.foodActual)&&isNum(w.foodTarget)?w.foodActual-w.foodTarget:null}
+function fanDelta(w){if(isNum(w.fanActual)&&isNum(w.fanDmaScore))return w.fanActual-w.fanDmaScore;return isNum(w.fanDma)?w.fanDma:null}
+function cogsMonths(ws,c){return qMonths(c).map(m=>{const w=[...ws].reverse().find(x=>monthKey(x.date)===m&&isNum(foodVar(x)));return{m,v:w?foodVar(w):null,w}})}
+function dedOf(w,c){const r=isNum(w.missedReceipts)?w.missedReceipts:0,k=isNum(w.missedClock)?w.missedClock:0;return{r,k,amt:r*c.rcptPenalty+k*c.clockPenalty}}
+const fmtFan=w=>{const d=fanDelta(w);if(isNum(w.fanActual)&&isNum(w.fanDmaScore))return w.fanActual+' / '+w.fanDmaScore+' ('+(d>=0?'+':'')+d.toFixed(1)+')';if(isNum(d))return(d>=0?'+':'')+d.toFixed(1)+' vs DMA';return w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':'—'};
+const fanCls=(w,c)=>{const d=fanDelta(w);if(isNum(d))return d>=c.fanDma?'c-ok':d>=c.fanDma-1?'c-warn':'c-bad';return w.fanQ===true?'c-ok':w.fanQ===false?'c-bad':''};
 function fileSave(name,text,type){const b=new Blob([text],{type});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
 function showMsg(t){const b=$('msgBanner');b.textContent=t;b.hidden=!t}
 
@@ -483,12 +517,12 @@ function load(){
         stores:{[sid]:{name:s.store||'My store',gm:s.name||'',laborGoal:isNum(s.laborGoal)?s.laborGoal:null,treat:!!s.treat,eco:s.eco||'pending',certs:s.certs||'pending',gatesQ:s.gatesQ||TQ.start}},weeks:{}};
       for(const[id,w]of Object.entries(o.weeks||{}))d.weeks[sid+'--'+id]={...w,storeId:sid};
       try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}}}
-  d=d||{};D={profile:{name:'',role:'om',...(d.profile||{})},goals:{...DEFGOALS,...(d.goals||{})},stores:d.stores||{},weeks:d.weeks||{},lastBackup:d.lastBackup||null};
+  d=d||{};D={profile:{name:'',role:'om',...(d.profile||{})},goals:{...DEFGOALS,...(d.goals||{})},stores:d.stores||{},weeks:d.weeks||{},lastBackup:d.lastBackup||null,syncUid:d.syncUid||null};
 }
 function pick(o,keys){const r={};for(const k of keys)if(o[k]!=null)r[k]=o[k];return r}
 function persist(){try{const txt=JSON.stringify(D);localStorage.setItem(KEY,txt);if(localStorage.getItem(KEY)!==txt)throw new Error('verify');return true}catch(e){showMsg('Could not save on this device. Private/incognito mode or full storage blocks saving. Your last change was NOT saved.');return false}}
 // re-read storage before every change so two open tabs never overwrite each other
-function mutate(fn){load();fn(D);return persist()}
+function mutate(fn){load();fn(D);const ok=persist();if(ok)cloudPush();return ok}
 const storeList=()=>Object.entries(D.stores).map(([id,s])=>({id,...s})).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
 const weekList=()=>Object.entries(D.weeks).map(([id,w])=>({id,...w}));
 
@@ -501,8 +535,8 @@ function cfgFor(s){const q=qCfg();const c={...DEFGOALS,...D.goals,label:q.label,
   const gatesCurrent=s&&(!s.gatesQ||s.gatesQ===TQ.start)&&q.start===TQ.start;
   c.eco=gatesCurrent?(s.eco||'pending'):'pending';c.certs=gatesCurrent?(s.certs||'pending'):'pending';c.gatesKnown=gatesCurrent;return c}
 const weeksFor=(sid,c)=>weekList().filter(w=>w.storeId===sid&&w.date&&w.date>=c.start&&w.date<=c.end).sort((a,b)=>a.date.localeCompare(b.date)||(a.week||0)-(b.week||0));
-function fanMonthOK(ws,c){const w=[...ws].reverse().find(x=>x.fanQ!=null||isNum(x.fanCount)||isNum(x.fanDma));if(!w)return null;
-  if(isNum(w.fanCount)&&isNum(w.fanDma))return w.fanCount>=c.fanMin&&w.fanDma>=c.fanDma;if(w.fanQ!=null)return w.fanQ===true;return null}
+function fanMonthOK(ws,c){const w=[...ws].reverse().find(x=>isNum(fanDelta(x))||x.fanQ!=null);if(!w)return null;
+  const d=fanDelta(w);if(isNum(d))return d>=c.fanDma;return w.fanQ===true}
 
 // ================= scoring =================
 function evaluate(ws,c){
@@ -513,12 +547,16 @@ function evaluate(ws,c){
    R.sales={s,val:pct(v),lw:last?pct(last.sales):'—',tr:trend(w=>w.sales,true),trFmt:pts,gap}}
   {const v=avg(ws.map(w=>w.txn)),g=c.txnGoal;let s='nodata',gap='';if(isNum(v)){s=v>=g+1?'on':v>=g-1.5?'risk':'off';gap=v>=g?`${(v-g).toFixed(1)} pts cushion over ${g}%`:`${(g-v).toFixed(1)} pts short of ${g}%`}
    R.txn={s,val:pct(v),lw:last?pct(last.txn):'—',tr:trend(w=>w.txn,true),trFmt:pts,gap}}
-  {const missed=ws.some(w=>w.counts===false),any=ws.some(w=>w.counts!=null);const v=avg(ws.map(foodVar)),mx=c.foodMax;let s='nodata',gap='';
+  {const missed=ws.some(w=>w.counts===false),any=ws.some(w=>w.counts!=null),cm=cogsMonths(ws,c),known=cm.filter(x=>isNum(x.v)),mx=c.foodMax;let s='nodata',gap='';
+   const over=known.filter(x=>x.v>mx),under=known.filter(x=>x.v<0),near=known.filter(x=>x.v>mx-0.5&&x.v<=mx);
    if(missed){s='off';gap='A week had incomplete counts/waste entries — category forfeited'}
-   else if(isNum(v)){if(v>mx){s='off';gap=`Variance ${v.toFixed(2)} pts is over the +${mx} max`}else if(v<0){s='risk';gap=`Actual is under ideal by ${(-v).toFixed(2)} pts — check counts are correct`}else if(v>mx-0.5){s='risk';gap=`Only ${(mx-v).toFixed(2)} pts under the +${mx} max`}else{s='on';gap=`${(mx-v).toFixed(2)} pts of room under the max`}}
-   else if(any)gap='Counts are clear. Enter actual vs target food cost to score this';
-   const lf=last?foodVar(last):null;
-   R.food={s,val:isNum(v)?(v>=0?'+':'')+v.toFixed(2)+' pts':(any?'Counts clear':'—'),lw:last?(isNum(lf)?(lf>=0?'+':'')+lf.toFixed(2)+' pts':(last.counts===true?'Counts ✓':last.counts===false?'Counts ✗':'—')):'—',tr:trend(foodVar,false),trFmt:d=>(d>0?'+':'')+d.toFixed(2)+' pts',gap}}
+   else if(over.length){s='off';gap=over.map(x=>monthName(x.m)+' COGS +'+x.v.toFixed(2)+' pts').join(', ')+' — over the +'+mx+' max'}
+   else if(under.length){s='risk';gap=under.map(x=>monthName(x.m)).join(', ')+' COGS under target — check counts are correct'}
+   else if(near.length){s='risk';gap=near.map(x=>monthName(x.m)).join(', ')+' COGS within 0.5 pt of the +'+mx+' max'}
+   else if(known.length){s='on';gap=known.length+' of '+cm.length+' months of COGS in range'}
+   else if(any)gap='Counts are clear. Enter monthly COGS actual vs target to score this';
+   const lastK=known[known.length-1];
+   R.food={s,val:known.length?known.map(x=>(x.v>=0?'+':'')+x.v.toFixed(2)).join(' · ')+' pts':(any?'Counts clear':'—'),lw:last?(last.counts===true?'Counts ✓':last.counts===false?'Counts ✗':'—')+(lastK?' · COGS '+monthName(lastK.m).split(' ')[0]+' '+(lastK.v>=0?'+':'')+lastK.v.toFixed(2):''):'—',tr:null,gap}}
   {const v=avg(ws.map(w=>w.labor)),g=c.laborGoal;let s='nodata',gap='';
    if(isNum(v)&&isNum(g)){s=v<g-0.5?'on':v<g?'risk':'off';gap=v<g?`${(g-v).toFixed(2)} pts under the ${g}% goal`:`${(v-g).toFixed(2)} pts over the ${g}% goal`}
    else if(isNum(v))gap='Labor is entered. Set this store’s labor goal % in Setup to score it';
@@ -529,12 +567,9 @@ function evaluate(ws,c){
    if(known.some(x=>x===false)){s='off';gap='A month missed the survey minimum or DMA target — category forfeited'}
    else if(known.length===res.length&&known.length){s='on';gap='All months qualified'}
    else if(known.length){s='risk';gap=`${known.length} of ${res.length} months qualified so far — every month must qualify`}
-   R.fan={s,val:known.length?`${known.filter(Boolean).length}/${res.length} months`:'—',lw:last?(last.fanQ===true?'Qualifies':last.fanQ===false?'Not yet':isNum(last.fanCount)?last.fanCount+' surveys':'—'):'—',tr:null,gap}}
-  {const v=avg(ws.map(w=>w.deliv)),st=avg(ws.map(w=>w.stars));let s='nodata',gap='';
-   if(isNum(v)||isNum(st)){const okV=isNum(v)&&v>=c.delivGoal,okS=isNum(st)&&st>=c.starGoal;
-     const parts=[!isNum(v)?'Enter delivery growth %':!okV?`Growth ${v.toFixed(1)}% vs ${c.delivGoal}% goal`:'',!isNum(st)?'Enter 4–5 star %':!okS?`Stars ${st.toFixed(0)}% vs ${c.starGoal}%`:''].filter(Boolean);
-     if(okV&&okS){s='on';gap='Both delivery goals met'}else if((isNum(v)&&v<c.delivGoal-5)||(isNum(st)&&st<c.starGoal-5)){s='off';gap=parts.join('; ')}else{s='risk';gap=parts.join('; ')}}
-   R.deliv={s,val:(isNum(v)?pct(v):'—')+(isNum(st)?' · '+st.toFixed(0)+'%★':''),lw:last&&isNum(last.deliv)?pct(last.deliv):'—',tr:trend(w=>w.deliv,true),trFmt:pts,gap}}
+   R.fan={s,val:known.length?`${known.filter(Boolean).length}/${res.length} months`:'—',lw:last?fmtFan(last):'—',tr:trend(fanDelta,true),trFmt:d=>(d>0?'+':'')+d.toFixed(1)+' pts',gap}}
+  {const v=avg(ws.map(w=>w.deliv)),g=c.delivGoal;let s='nodata',gap='';if(isNum(v)){s=v>=g+2?'on':v>=g-5?'risk':'off';gap=v>=g?`${(v-g).toFixed(1)} pts over the ${g}% goal`:`${(g-v).toFixed(1)} pts short of ${g}%`}
+   R.deliv={s,val:pct(v),lw:last&&isNum(last.deliv)?pct(last.deliv):'—',tr:trend(w=>w.deliv,true),trFmt:pts,gap}}
   {const misses=months.map(m=>{const x=ws.filter(w=>monthKey(w.date)===m&&isNum(w.truck));return x.length?x.reduce((a,w)=>a+w.truck,0):null});
    const bad=misses.filter(x=>x>0).length,known=misses.filter(x=>x!=null).length;let s='nodata',gap='';
    if(known){s=bad?(bad===months.length?'off':'risk'):'on';gap=bad?`${bad} month(s) forfeited by a missed count — ${months.length-bad} still open`:'No missed counts so far'}
@@ -548,10 +583,10 @@ function payout(R){const P={gmOn:0,amOn:0,gmRisk:0,amRisk:0,gmOff:0,amOff:0,gmNo
   return P}
 function summarize(s,wsOverride){const c=cfgFor(s),ws=wsOverride||weeksFor(s.id,c),R=evaluate(ws,c),P=payout(R);
   const blocked=c.eco==='fail'||c.certs==='no';const sum=f=>ws.reduce((a,w)=>a+(isNum(w[f])?w[f]:0),0);
-  const shortT=sum('short'),ded=(shortT>c.shortMax?shortT:0)+sum('payout')+sum('noReceipt');
-  return{s,c,ws,R,P,blocked,shortT,ded,last:ws[ws.length-1],
-    gmLikely:blocked?0:Math.max(0,P.gmOn-ded),amLikely:blocked?0:P.amOn,
-    gmBest:blocked?0:Math.max(0,P.gmOn+P.gmRisk+P.gmNo-ded),amBest:blocked?0:P.amOn+P.amRisk+P.amNo}}
+  const rc=sum('missedReceipts'),ck=sum('missedClock'),ded=rc*c.rcptPenalty+ck*c.clockPenalty,amDed=c.dedTo==='both'?ded:0;
+  return{s,c,ws,R,P,blocked,rc,ck,ded,last:ws[ws.length-1],
+    gmLikely:blocked?0:Math.max(0,P.gmOn-ded),amLikely:blocked?0:Math.max(0,P.amOn-amDed),
+    gmBest:blocked?0:Math.max(0,P.gmOn+P.gmRisk+P.gmNo-ded),amBest:blocked?0:Math.max(0,P.amOn+P.amRisk+P.amNo-amDed)}}
 const RANK={off:3,risk:2,nodata:1,on:0};
 const dollarsFor=(cr)=>D.profile.role==='am'?cr.am:cr.gm;
 
@@ -619,12 +654,12 @@ function renderOverview(stores){
   // latest week
   const wb=$('ovWeekBody');wb.replaceChildren();
   for(const x of xs){const w=x.last,c=x.c;
-    if(!w){wb.append(el('tr',null,el('td',null,el('strong',null,x.s.name)),el('td',{colspan:'8',class:'muted'},'No entry this quarter')));continue}
+    if(!w){wb.append(el('tr',null,el('td',null,el('strong',null,x.s.name)),el('td',{colspan:'9',class:'muted'},'No entry this quarter')));continue}
     wb.append(el('tr',null,el('td',null,el('strong',null,x.s.name)),el('td',{class:'num'},'Wk '+(w.week??'?')),
       el('td',{class:'r num '+cls(w.sales,c.salesGoal,c.salesGoal-2,true)},pct(w.sales)),el('td',{class:'r num '+cls(w.txn,c.txnGoal,c.txnGoal-1.5,true)},pct(w.txn)),
       el('td',{class:'r num '+(isNum(c.laborGoal)?cls(w.labor,c.laborGoal-0.5,c.laborGoal,false):'')},pctPlain(w.labor)),el('td',{class:'r num '+cls(w.dt,c.dtGoal-10,c.dtGoal,false)},fmtDT(w.dt)),
       el('td',{class:w.counts===true?'c-ok':w.counts===false?'c-bad':''},w.counts===true?'Clear':w.counts===false?'Missed':'—'),
-      el('td',{class:w.fanQ===true?'c-ok':w.fanQ===false?'c-bad':''},w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':'—'),
+      el('td',{class:fanCls(w,c)},fmtFan(w)),el('td',{class:'r num '+(dedOf(w,c).amt?'c-bad':'')},dedOf(w,c).amt?'−'+money(dedOf(w,c).amt):'—'),
       el('td',{class:'note'},w.actions||'—')))}
 }
 function cls(v,good,warn,higher){return !isNum(v)?'':higher?(v>=good?'c-ok':v>=warn?'c-warn':'c-bad'):(v<=good?'c-ok':v<=warn?'c-warn':'c-bad')}
@@ -645,8 +680,8 @@ function renderStore(s){
   const ecoS={pass:'on',fail:'off',pending:'nodata'}[c.eco]||'nodata',certS={yes:'on',exception:'on',no:'off',pending:'nodata'}[c.certs]||'nodata';
   $('gates').replaceChildren(pill(ecoS,'EcoSure: '+({pass:'passed',fail:'FAILED — all bonus forfeited',pending:'pending'}[c.eco])),
     pill(certS,'2 certified AMs: '+({yes:'yes',exception:'exception',no:'NO — not eligible',pending:'confirm'}[c.certs])),
-    pill(x.shortT>c.shortMax?'off':x.shortT>c.shortMax*0.7?'risk':'on','Shortages '+money(x.shortT)+' / '+money(c.shortMax)));
-  $('dedSub').textContent=(x.ded?`${money(x.ded)} deducted from GM projection (shortage over limit, unapproved payouts, payouts without receipt). `:'No deductions logged this quarter. ')+(c.gatesKnown?'':'Gates show pending for past quarters.');
+    pill(x.ded?'off':'on',x.ded?`Deductions −${money(x.ded)}`:'No deductions'));
+  $('dedSub').textContent=(x.ded?`${x.rc} missed receipt upload${x.rc===1?'':'s'} × ${money(c.rcptPenalty)} + ${x.ck} missed clock-out${x.ck===1?'':'s'} × ${money(c.clockPenalty)} = −${money(x.ded)} off the ${c.dedTo==='both'?'GM and each AM':'GM'} bonus. `:'No missed receipt uploads or clock-outs this quarter. ')+(c.gatesKnown?'':'Gates show pending for past quarters.');
   // focus
   const items=CRIT.filter(cr=>R[cr.k].s!=='on').sort((a,b)=>(RANK[R[b.k].s]-RANK[R[a.k].s])||(dollarsFor(b)-dollarsFor(a))).slice(0,4);
   const fx=$('focus');fx.replaceChildren();
@@ -662,34 +697,37 @@ function renderStore(s){
   renderHistory(s,c,ws,useAm);
   // weekly log
   const wb=$('weekBody');wb.replaceChildren();
-  if(!ws.length)wb.append(el('tr',null,el('td',{colspan:'13',class:'empty'},'No weeks in this quarter yet. Tap “Add Thursday entry” after each meeting.')));
-  [...ws].reverse().forEach(w=>{const fv=foodVar(w);const fan=w.fanQ===true?'Qualifies':w.fanQ===false?'Not yet':isNum(w.fanCount)?w.fanCount+' / '+c.fanMin:'—';
+  if(!ws.length)wb.append(el('tr',null,el('td',{colspan:'14',class:'empty'},'No weeks in this quarter yet. Tap “Add Thursday entry” after each meeting.')));
+  [...ws].reverse().forEach(w=>{const fv=foodVar(w);const dd=dedOf(w,c);
     const disc=[w.complaints&&('Complaints: '+w.complaints),w.why&&('Why: '+w.why),w.actions&&('Action: '+w.actions)].filter(Boolean).join(' · ');
-    const b=el('button',{class:'btn small',type:'button'},'Edit');b.addEventListener('click',()=>openForm(w));
-    wb.append(el('tr',null,el('td',null,el('strong',null,'Wk '+(w.week??'?')),el('div',{class:'by'},w.date)),
+    const b=el('button',{class:'btn small',type:'button'},'View / edit');b.addEventListener('click',e=>{e.stopPropagation();openForm(w)});
+    const row=el('tr',{class:'link',tabindex:'0',title:'Open week '+(w.week??'')});row.addEventListener('click',()=>openForm(w));row.addEventListener('keydown',e=>{if(e.key==='Enter')openForm(w)});
+    wb.append(row);row.append(el('td',null,el('strong',null,'Wk '+(w.week??'?')),el('div',{class:'by'},w.date)),
       el('td',{class:'r num '+cls(w.sales,c.salesGoal,c.salesGoal-2,true)},pct(w.sales)),el('td',{class:'r num '+cls(w.txn,c.txnGoal,c.txnGoal-1.5,true)},pct(w.txn)),
       el('td',{class:'r num'},isNum(w.cakes)?(w.cakes>0?'+':'')+w.cakes:'—'),el('td',{class:'r num'},isNum(w.cupcakes)?(w.cupcakes>0?'+':'')+w.cupcakes:'—'),
       el('td',{class:w.counts===true?'c-ok':w.counts===false?'c-bad':''},w.counts===true?'Clear':w.counts===false?'Missed':'—'),
       el('td',{class:'r num '+(isNum(fv)?(fv<0||fv>c.foodMax?'c-bad':fv>c.foodMax-0.5?'c-warn':'c-ok'):'')},isNum(fv)?(fv>=0?'+':'')+fv.toFixed(2):'—'),
       el('td',{class:'r num '+(isNum(c.laborGoal)?cls(w.labor,c.laborGoal-0.5,c.laborGoal,false):'')},pctPlain(w.labor)),
       el('td',{class:'r num '+cls(w.dt,c.dtGoal-10,c.dtGoal,false)},fmtDT(w.dt)),
-      el('td',{class:w.fanQ===true?'c-ok':w.fanQ===false?'c-bad':''},fan),
+      el('td',{class:fanCls(w,c)},fmtFan(w)),
       el('td',{class:'r num '+(isNum(w.truck)?(w.truck>0?'c-bad':'c-ok'):'')},isNum(w.truck)?String(w.truck):'—'),
-      el('td',{class:'note'},disc||'—'),el('td',null,b)))});
+      el('td',{class:'r num '+(dd.amt?'c-bad':'')},dd.amt?'−'+money(dd.amt):'—'),
+      el('td',{class:'note'},disc||'—'),el('td',null,b))});
   // monthly
   const mb=$('monthBody');mb.replaceChildren();const tg=CRIT.find(cr=>cr.k==='truck'),months=qMonths(c);
   for(const m of months){const xs=ws.filter(w=>monthKey(w.date)===m),ok=fanMonthOK(xs,c),miss=xs.filter(w=>isNum(w.truck)),missT=miss.reduce((a,w)=>a+w.truck,0),share=1/months.length;
     mb.append(el('tr',null,el('td',null,el('strong',null,monthName(m))),el('td',{class:'r num'},String(xs.length)),
       el('td',{class:'r num'},pct(avg(xs.map(w=>w.sales)))),el('td',{class:'r num'},pct(avg(xs.map(w=>w.txn)))),
-      el('td',{class:'r num'},(v=>isNum(v)?(v>=0?'+':'')+v.toFixed(2)+' pts':'—')(avg(xs.map(foodVar)))),
+      el('td',{class:'r num'},(v=>isNum(v)?(v>=0?'+':'')+v.toFixed(2)+' pts':'—')((cogsMonths(ws,c).find(x=>x.m===m)||{}).v)),
       el('td',{class:'r num'},pctPlain(avg(xs.map(w=>w.labor)))),el('td',{class:'r num'},fmtDT(avg(xs.map(w=>w.dt)))),
       el('td',null,ok==null?'—':pill(ok?'on':'off',ok?'Qualified':'Missed')),el('td',{class:'r num'},miss.length?String(missT):'—'),
-      el('td',{class:'r num'},!miss.length?'—':missT>0?'$0 (forfeited)':money(tg.gm*share)+' / '+money(tg.am*share))))}
+      el('td',{class:'r num'},!miss.length?'—':missT>0?'$0 (forfeited)':money(tg.gm*share)+' / '+money(tg.am*share)),
+      el('td',{class:'r num '+(xs.reduce((a,w)=>a+dedOf(w,c).amt,0)?'c-bad':'')},(v=>v?'−'+money(v):'—')(xs.reduce((a,w)=>a+dedOf(w,c).amt,0)))))}
   // how-to
-  const extra={sales:'Avg of weekly % vs LY. On track at goal +1 pt; at risk within 2 pts below goal.',txn:'Avg of weekly % vs LY. On track at goal +1 pt.',food:'Variance = actual food cost % − ideal %. If counts are complete but variance misses, BOTH food and count categories are lost.',labor:'Avg weekly labor %; must stay under goal. At risk within 0.5 pt of goal.',fan:'Checked monthly from the latest entry each month. Every month must qualify. Treat stores: 30 surveys.',deliv:'Delivery count vs last quarter, plus avg share of 4–5 star reviews.',truck:'Paid per month (1/3 each). Any missed count that month loses that month’s third.',dt:'Avg drive-thru time per order. At risk within 10 sec of the line.'};
+  const extra={sales:'Avg of weekly % vs LY. On track at goal +1 pt; at risk within 2 pts below goal.',txn:'Avg of weekly % vs LY. On track at goal +1 pt.',food:'COGS is entered once a month; variance = COGS actual % − target %. Every month must be in range. If counts are complete but COGS misses, BOTH categories are lost.',labor:'Avg weekly labor %; must stay under goal. At risk within 0.5 pt of goal.',fan:'Each week enter the store score and the store DMA (DMA changes weekly). The latest entry in each month decides that month; every month must qualify.',deliv:'Delivery count vs last quarter.',truck:'Paid per month (1/3 each). Any missed count that month loses that month’s third.',dt:'Avg drive-thru time per order. At risk within 10 sec of the line.'};
   const dl=$('howto');dl.replaceChildren();
   for(const cr of CRIT)dl.append(el('dt',null,`${cr.name} — ${money(cr.gm)} GM / ${money(cr.am)} AM`),el('dd',null,RULES[cr.k](c)+'. '+extra[cr.k]));
-  dl.append(el('dt',null,'Gates & deductions'),el('dd',null,`EcoSure failure forfeits all bonus. Store must have 2 AMs with P1, P2 & ServSafe (exceptions apply). Total shortages over ${money(c.shortMax)}, unapproved cash payouts and payouts without receipt are deducted.`));
+  dl.append(el('dt',null,'Gates & deductions'),el('dd',null,`EcoSure failure forfeits all bonus. Store must have 2 AMs with P1, P2 & ServSafe (exceptions apply). Each receipt not uploaded to Drive costs ${money(c.rcptPenalty)} and each missed clock-out costs ${money(c.clockPenalty)}, taken off the ${c.dedTo==='both'?'GM and each AM':'GM'} bonus.`));
 }
 $('storePick').addEventListener('change',e=>go('store',e.target.value));
 
@@ -698,15 +736,15 @@ let lastHist=null;
 function renderHistory(s,c,ws,useAm){
   const snaps=ws.map((w,i)=>{const x=summarize(s,ws.slice(0,i+1));return{w,R:x.R,gm:x.gmLikely,am:x.amLikely}});
   lastHist={c,snaps,useAm};
-  $('histHead').replaceChildren(el('tr',null,el('th',null,'Week'),el('th',{class:'r'},'GM projected'),el('th',{class:'r'},'AM projected'),el('th',{class:'r'},'Change'),el('th',null,'Criteria (sales · food · labor · fan · trans · deliv · truck · DT)'),el('th',null,'Action items')));
+  $('histHead').replaceChildren(el('tr',null,el('th',null,'Week'),el('th',{class:'r'},'GM projected'),el('th',{class:'r'},'AM projected'),el('th',{class:'r'},'Change'),el('th',null,'Criteria (sales · COGS · labor · fan · trans · deliv · truck · DT)'),el('th',null,'Action items'),el('th',null,'')));
   const hb=$('histBody');hb.replaceChildren();
-  if(!snaps.length)hb.append(el('tr',null,el('td',{colspan:'6',class:'empty'},'No weeks saved for this quarter yet.')));
+  if(!snaps.length)hb.append(el('tr',null,el('td',{colspan:'7',class:'empty'},'No weeks saved for this quarter yet.')));
   [...snaps].reverse().forEach((sn,ri)=>{const i=snaps.length-1-ri,prev=snaps[i-1],v=useAm?sn.am:sn.gm,d=prev?v-(useAm?prev.am:prev.gm):null;
     hb.append(el('tr',null,el('td',null,el('strong',null,'Wk '+(sn.w.week??'?')),el('div',{class:'by'},sn.w.date)),
       el('td',{class:'r num'},money(sn.gm)),el('td',{class:'r num'},money(sn.am)),
       el('td',{class:'r num '+(d==null?'':d>0?'up':d<0?'down':'')},d==null?'—':(d>0?'▲ +':d<0?'▼ −':'')+money(Math.abs(d))),
       el('td',null,el('div',{class:'dots'},...CRIT.map(cr=>el('span',{class:'dot s-'+sn.R[cr.k].s,title:cr.name+': '+({on:'on track',risk:'at risk',off:'missing',nodata:'no data'}[sn.R[cr.k].s])})))),
-      el('td',{class:'note'},sn.w.actions||'—')))});
+      el('td',{class:'note'},sn.w.actions||'—'),el('td',null,(()=>{const b=el('button',{class:'btn small',type:'button'},'View / edit');b.addEventListener('click',()=>openForm(sn.w));return b})())))});
   drawCharts();
 }
 const NS='http://www.w3.org/2000/svg';
@@ -742,24 +780,33 @@ function drawCharts(){
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(drawCharts,150)});
 
 // ---------- weekly form ----------
-const NUMF={sales:'f_sales',txn:'f_txn',cakes:'f_cakes',cupcakes:'f_cupcakes',foodActual:'f_foodActual',foodTarget:'f_foodTarget',labor:'f_labor',fanCount:'f_fanCount',fanDma:'f_fanDma',deliv:'f_deliv',stars:'f_stars',truck:'f_truck',short:'f_short',payout:'f_payout',noReceipt:'f_noReceipt'};
+const NUMF={sales:'f_sales',txn:'f_txn',cakes:'f_cakes',cupcakes:'f_cupcakes',foodActual:'f_foodActual',foodTarget:'f_foodTarget',labor:'f_labor',fanActual:'f_fanActual',fanDmaScore:'f_fanDmaScore',deliv:'f_deliv',truck:'f_truck',missedReceipts:'f_missedReceipts',missedClock:'f_missedClock'};
 const triIn=v=>v===true?'yes':v===false?'no':'';
 const triOut=v=>v==='yes'?true:v==='no'?false:null;
 function openForm(w){editingId=w?w.id:null;delArmed=false;dupArmed=null;$('delBtn').textContent='Delete week';
   const s=D.stores[cur];$('formTitle').textContent=(w?'Edit week '+w.week:'New Thursday entry')+(s?' — '+s.name:'');
-  $('f_week').value=w?.week??'';$('f_date').value=w?.date??TODAY;
+  const prevW=weekList().filter(x=>x.storeId===cur&&isNum(x.week)).sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0];
+  $('f_week').value=w?w.week:(prevW?(prevW.week%53)+1:'');$('f_date').value=w?.date??TODAY;
   for(const[k,id]of Object.entries(NUMF))$(id).value=isNum(w?.[k])?w[k]:'';
-  $('f_counts').value=triIn(w?.counts);$('f_fanQ').value=triIn(w?.fanQ);$('f_dt').value=isNum(w?.dt)?fmtDT(w.dt):'';
+  $('f_counts').value=triIn(w?.counts);$('f_dt').value=isNum(w?.dt)?fmtDT(w.dt):'';
   $('f_complaints').value=w?.complaints||'';$('f_why').value=w?.why||'';$('f_actions').value=w?.actions||'';
-  $('delBtn').hidden=!w;$('formMsg').textContent='';const p=$('entryPanel');p.open=true;p.scrollIntoView({behavior:'smooth',block:'start'})}
+  $('delBtn').hidden=!w;$('formMsg').textContent='';updateHints();const p=$('entryPanel');p.open=true;p.scrollIntoView({behavior:'smooth',block:'start'})}
+function updateHints(){const c=cfgFor(D.stores[cur]?{id:cur,...D.stores[cur]}:null),date=$('f_date').value||TODAY,m=monthKey(date);
+  const has=weekList().find(x=>x.storeId===cur&&x.id!==editingId&&x.date&&monthKey(x.date)===m&&isNum(foodVar(x)));
+  $('cogsHint').textContent=has?`COGS for ${monthName(m)} is already entered (week ${has.week}). Leave blank unless it changed.`:`No COGS yet for ${monthName(m)}. Enter it once the month's numbers are in.`;
+  $('fanHint').textContent=`Store actual must be ${c.fanDma}+ points above DMA to qualify.`;
+  $('dedHint').textContent=`Each missed receipt upload = −${money(c.rcptPenalty)}, each missed clock-out = −${money(c.clockPenalty)} off the ${c.dedTo==='both'?'GM and each AM':'GM'} bonus.`}
+$('f_date').addEventListener('change',updateHints);
 $('newWeekBtn').addEventListener('click',()=>openForm(null));
 $('cancelBtn').addEventListener('click',()=>{$('entryPanel').open=false;editingId=null});
 $('delBtn').addEventListener('click',()=>{if(!editingId)return;if(!delArmed){delArmed=true;$('delBtn').textContent='Tap again to delete';return}
   const id=editingId;if(mutate(d=>{delete d.weeks[id]})){$('entryPanel').open=false;editingId=null;render();showMsg('Week deleted.');setTimeout(()=>showMsg(''),2500)}});
 $('weekForm').addEventListener('submit',e=>{e.preventDefault();if(!cur)return;
   const week=numOut($('f_week').value),date=$('f_date').value;if(!week||!date){$('formMsg').textContent='Enter the week number and meeting date.';return}
-  const doc={storeId:cur,week,date,counts:triOut($('f_counts').value),fanQ:triOut($('f_fanQ').value),dt:parseDT($('f_dt').value),complaints:$('f_complaints').value.trim(),why:$('f_why').value.trim(),actions:$('f_actions').value.trim(),at:new Date().toISOString()};
+  const doc={storeId:cur,week,date,counts:triOut($('f_counts').value),dt:parseDT($('f_dt').value),complaints:$('f_complaints').value.trim(),why:$('f_why').value.trim(),actions:$('f_actions').value.trim(),at:new Date().toISOString()};
   for(const[k,id]of Object.entries(NUMF))doc[k]=numOut($(id).value);
+  for(const k of ['missedReceipts','missedClock','truck'])if(isNum(doc[k])&&(doc[k]<0||doc[k]%1)){$('formMsg').textContent='Counts must be whole numbers, 0 or more.';return}
+  if(editingId&&D.weeks[editingId]){const o=D.weeks[editingId];if(o.fanQ!=null&&!isNum(doc.fanActual))doc.fanQ=o.fanQ;if(isNum(o.fanDma)&&!isNum(doc.fanActual))doc.fanDma=o.fanDma}
   const newId=cur+'--'+date.slice(0,4)+'-w'+String(week).padStart(2,'0');
   load();
   if(newId!==editingId&&D.weeks[newId]&&dupArmed!==newId){dupArmed=newId;$('formMsg').textContent='Week '+week+' is already saved for this store. Tap Save again to replace it.';return}
@@ -772,7 +819,7 @@ function renderSetup(stores){
   $('welcome').hidden=!!stores.length;
   dlItems($('profView'),[['Name',D.profile.name||'—'],['Role',ROLE_T[D.profile.role]||'—']]);
   const g=D.goals;
-  dlItems($('goalView'),[['Sales','+'+g.salesGoal+'% vs LY'],['Transactions','+'+g.txnGoal+'% vs LY'],['Food cost variance','0 to +'+g.foodMax+' pts'],['Drive-thru',fmtDT(g.dtGoal)+' or faster'],['Fan score','+'+g.fanDma+' vs DMA'],['Deliveries','+'+g.delivGoal+'%, '+g.starGoal+'% 4–5★'],['Shortage limit',money(g.shortMax)]]);
+  dlItems($('goalView'),[['Sales','+'+g.salesGoal+'% vs LY'],['Transactions','+'+g.txnGoal+'% vs LY'],['COGS variance (monthly)','0 to +'+g.foodMax+' pts'],['Drive-thru',fmtDT(g.dtGoal)+' or faster'],['Fan score','+'+g.fanDma+' vs store DMA'],['Deliveries','+'+g.delivGoal+'% vs last qtr'],['Missed receipt upload','−'+money(g.rcptPenalty)+' each'],['Missed clock-out','−'+money(g.clockPenalty)+' each'],['Deductions from',g.dedTo==='both'?'GM and each AM':'GM bonus']]);
   const L=$('storeList');L.replaceChildren();
   if(!stores.length)L.append(el('div',{class:'muted'},'No stores yet. Add the store(s) you run.'));
   for(const s of stores){const gq=!s.gatesQ||s.gatesQ===TQ.start;
@@ -786,10 +833,10 @@ $('profEdit').addEventListener('click',()=>{$('p_name').value=D.profile.name||''
 $('profCancel').addEventListener('click',()=>{$('profForm').hidden=true;$('profBtns').hidden=false;$('profView').hidden=false});
 $('profForm').addEventListener('submit',e=>{e.preventDefault();const prof={name:$('p_name').value.trim(),role:$('p_role').value};if(mutate(d=>{d.profile=prof})){$('profForm').hidden=true;$('profBtns').hidden=false;$('profView').hidden=false;render()}});
 // goals
-$('goalEdit').addEventListener('click',()=>{const g=D.goals;$('g_sales').value=g.salesGoal;$('g_txn').value=g.txnGoal;$('g_food').value=g.foodMax;$('g_dt').value=fmtDT(g.dtGoal);$('g_fanDma').value=g.fanDma;$('g_deliv').value=g.delivGoal;$('g_stars').value=g.starGoal;$('g_shortMax').value=g.shortMax;$('goalForm').hidden=false;$('goalBtns').hidden=true;$('goalView').hidden=true});
+$('goalEdit').addEventListener('click',()=>{const g=D.goals;$('g_sales').value=g.salesGoal;$('g_txn').value=g.txnGoal;$('g_food').value=g.foodMax;$('g_dt').value=fmtDT(g.dtGoal);$('g_fanDma').value=g.fanDma;$('g_deliv').value=g.delivGoal;$('g_rcpt').value=g.rcptPenalty;$('g_clock').value=g.clockPenalty;$('g_dedTo').value=g.dedTo||'gm';$('goalForm').hidden=false;$('goalBtns').hidden=true;$('goalView').hidden=true});
 $('goalCancel').addEventListener('click',()=>{$('goalForm').hidden=true;$('goalBtns').hidden=false;$('goalView').hidden=false});
 $('goalForm').addEventListener('submit',e=>{e.preventDefault();const n=(id,d)=>{const v=numOut($(id).value);return v==null?d:v};
-  const goals={salesGoal:n('g_sales',6),txnGoal:n('g_txn',2),foodMax:n('g_food',2.5),dtGoal:parseDT($('g_dt').value)??240,fanDma:n('g_fanDma',2),delivGoal:n('g_deliv',10),starGoal:n('g_stars',85),shortMax:n('g_shortMax',180)};
+  const goals={salesGoal:n('g_sales',6),txnGoal:n('g_txn',2),foodMax:n('g_food',2.5),dtGoal:parseDT($('g_dt').value)??240,fanDma:n('g_fanDma',2),delivGoal:n('g_deliv',10),rcptPenalty:Math.max(0,n('g_rcpt',50)),clockPenalty:Math.max(0,n('g_clock',50)),dedTo:$('g_dedTo').value==='both'?'both':'gm'};
   if(mutate(d=>{d.goals=goals})){$('goalForm').hidden=true;$('goalBtns').hidden=false;$('goalView').hidden=false;render()}});
 // stores
 function editStore(s){editingStore=s?s.id:null;storeDelArmed=false;$('storeDel').textContent='Remove store';
@@ -819,10 +866,128 @@ $('restoreFile').addEventListener('change',async e=>{const f=e.target.files&&e.t
     if(mutate(d=>{d.stores={...d.stores,...(inc.stores||{})};d.weeks={...d.weeks,...(inc.weeks||{})};if(inc.goals)d.goals={...DEFGOALS,...inc.goals};if(inc.profile)d.profile={...d.profile,...inc.profile}})){closeStoreForm();render();showMsg('Restored '+Object.keys(inc.stores||{}).length+' store(s) and '+Object.keys(inc.weeks||{}).length+' week(s) from '+f.name+'.')}}
   catch(err){showMsg('Could not restore: '+(err&&err.message||'unreadable file')+'. Pick a .json file made with Backup.')}
   e.target.value=''});
-$('csvBtn').addEventListener('click',()=>{const cols=['store','week','date','sales','txn','cakes','cupcakes','counts','foodActual','foodTarget','labor','dt','fanQ','fanCount','fanDma','deliv','stars','truck','short','payout','noReceipt','complaints','why','actions'];
+$('csvBtn').addEventListener('click',()=>{const cols=['store','week','date','sales','txn','cakes','cupcakes','counts','foodActual','foodTarget','labor','dt','fanActual','fanDmaScore','deliv','truck','missedReceipts','missedClock','complaints','why','actions'];
   const esc=v=>{if(v==null)return'';const s=String(v);return/[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
   const rows=[cols.join(',')].concat(weekList().sort((a,b)=>(a.storeId||'').localeCompare(b.storeId||'')||(a.date||'').localeCompare(b.date||'')).map(w=>cols.map(c=>c==='store'?esc((D.stores[w.storeId]||{}).name||w.storeId):c==='dt'?esc(isNum(w.dt)?fmtDT(w.dt):''):esc(w[c])).join(',')));
   fileSave('performance-tracker-weeks-'+TODAY+'.csv',rows.join('\n'),'text/csv')});
+
+
+// ================= cloud sync (optional, Firebase) =================
+// Turned on only when window.TRACKER_FIREBASE_CONFIG is filled in (see README).
+const SYNC={adapter:null,uid:null,email:null,state:'off',cloudMeta:undefined,cloudWeeks:undefined,unsub:null,merged:false,err:''};
+const metaOf=d=>({profile:d.profile,goals:d.goals,stores:d.stores});
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function loadScript(src){return new Promise((res,rej)=>{const t=document.createElement('script');t.src=src;t.async=true;t.onload=res;t.onerror=()=>rej(new Error('Could not load '+src));document.head.append(t)})}
+async function firebaseAdapter(cfg){
+  const base='https://www.gstatic.com/firebasejs/10.12.2/';
+  await loadScript(base+'firebase-app-compat.js');await loadScript(base+'firebase-auth-compat.js');await loadScript(base+'firebase-firestore-compat.js');
+  const fb=window.firebase;fb.initializeApp(cfg);const auth=fb.auth(),fs=fb.firestore();
+  try{await fs.enablePersistence({synchronizeTabs:true})}catch(e){}
+  const u=uid=>fs.collection('users').doc(uid);
+  return{
+    onAuth:cb=>auth.onAuthStateChanged(x=>cb(x?{uid:x.uid,email:x.email}:null)),
+    signIn:(e,p)=>auth.signInWithEmailAndPassword(e,p),
+    signUp:(e,p)=>auth.createUserWithEmailAndPassword(e,p),
+    reset:e=>auth.sendPasswordResetEmail(e),
+    signOut:()=>auth.signOut(),
+    pending:()=>fs.waitForPendingWrites?fs.waitForPendingWrites():Promise.resolve(),
+    watch:(uid,onMeta,onWeeks,onErr)=>{
+      const a=u(uid).collection('meta').doc('main').onSnapshot({includeMetadataChanges:true},d=>onMeta(d.exists?d.data():null,d.metadata.hasPendingWrites,d.metadata.fromCache),onErr);
+      const b=u(uid).collection('weeks').onSnapshot({includeMetadataChanges:true},q=>{const o={};q.forEach(d=>{o[d.id]=d.data()});onWeeks(o,q.metadata.hasPendingWrites,q.metadata.fromCache)},onErr);
+      return()=>{a();b()}},
+    write:(uid,ops)=>{const jobs=[];for(let i=0;i<ops.length;i+=400){const bt=fs.batch();for(const op of ops.slice(i,i+400)){const ref=op.meta?u(uid).collection('meta').doc('main'):u(uid).collection('weeks').doc(op.id);if(op.del)bt.delete(ref);else bt.set(ref,op.data)}jobs.push(bt.commit())}return Promise.all(jobs)}
+  }}
+function setSync(state,err){SYNC.state=state;if(err!==undefined)SYNC.err=err;renderSyncUI()}
+function friendlyAuthErr(e){const c=(e&&e.code)||'';
+  if(/invalid-credential|wrong-password|user-not-found|invalid-login/.test(c))return'Email or password is not right.';
+  if(/email-already-in-use/.test(c))return'An account with this email already exists. Use Sign in.';
+  if(/weak-password/.test(c))return'Password must be at least 6 characters.';
+  if(/invalid-email/.test(c))return'That email address does not look right.';
+  if(/network/.test(c))return'No internet connection. Try again when online.';
+  if(/too-many-requests/.test(c))return'Too many tries. Wait a few minutes and try again.';
+  return(e&&e.message)||'Something went wrong.'}
+function cloudPush(){
+  if(!SYNC.adapter||!SYNC.uid||!SYNC.merged)return;
+  const ops=[],cw=SYNC.cloudWeeks||{};
+  if(!same(metaOf(D),SYNC.cloudMeta)){ops.push({meta:true,data:JSON.parse(JSON.stringify(metaOf(D)))});SYNC.cloudMeta=JSON.parse(JSON.stringify(metaOf(D)))}
+  for(const[id,w]of Object.entries(D.weeks))if(!same(w,cw[id])){ops.push({id,data:w});cw[id]=w}
+  for(const id of Object.keys(cw))if(!D.weeks[id]){ops.push({id,del:true});delete cw[id]}
+  SYNC.cloudWeeks=cw;
+  if(!ops.length)return;
+  setSync('saving');
+  SYNC.adapter.write(SYNC.uid,ops).then(()=>setSync('synced','')).catch(e=>setSync('error','Could not sync: '+((e&&e.message)||'error')+'. Your changes are still saved on this device.'));
+}
+function applyCloud(){
+  if(SYNC.cloudMeta===undefined||SYNC.cloudWeeks===undefined)return;
+  load();
+  if(!SYNC.merged){
+    // first snapshot after sign-in: merge this device's data with the cloud copy
+    const fromOther=D.syncUid&&D.syncUid!==SYNC.uid;
+    const localWeeks=fromOther?{}:D.weeks,localStores=fromOther?{}:D.stores;
+    const cm=SYNC.cloudMeta;
+    D.stores={...localStores,...((cm&&cm.stores)||{})};
+    D.weeks={...localWeeks,...SYNC.cloudWeeks};
+    if(cm){D.profile={...D.profile,...(cm.profile||{})};D.goals={...DEFGOALS,...(cm.goals||{})}}
+    else if(fromOther){D.profile={name:'',role:'om'};D.goals={...DEFGOALS}}
+    D.syncUid=SYNC.uid;SYNC.merged=true;persist();cloudPush();
+  }else{
+    D.stores=(SYNC.cloudMeta&&SYNC.cloudMeta.stores)||{};D.weeks={...SYNC.cloudWeeks};
+    if(SYNC.cloudMeta){D.profile={name:'',role:'om',...(SYNC.cloudMeta.profile||{})};D.goals={...DEFGOALS,...(SYNC.cloudMeta.goals||{})}}
+    persist();
+  }
+  render();
+}
+function startWatch(){
+  if(SYNC.unsub)SYNC.unsub();SYNC.merged=false;SYNC.cloudMeta=undefined;SYNC.cloudWeeks=undefined;setSync('loading');
+  SYNC.unsub=SYNC.adapter.watch(SYNC.uid,
+    (m,pending,cache)=>{SYNC.cloudMeta=m?JSON.parse(JSON.stringify(m)):null;if(SYNC.merged||!cache||navigator.onLine===false)applyCloud();if(!pending&&!cache)setSync('synced')},
+    (w,pending,cache)=>{SYNC.cloudWeeks=JSON.parse(JSON.stringify(w));if(SYNC.merged||!cache||navigator.onLine===false)applyCloud();if(!pending&&!cache&&SYNC.state!=='error')setSync('synced')},
+    e=>setSync('error','Sync stopped: '+((e&&e.message)||'error')+'. Check the Firestore rules in the README.'));
+}
+async function initCloud(){
+  const cfg=window.TRACKER_FIREBASE_CONFIG;const custom=window.TRACKER_CLOUD_ADAPTER;
+  if(!cfg&&!custom){setSync('off');return}
+  setSync('connecting');
+  try{SYNC.adapter=custom?await custom():await firebaseAdapter(cfg)}catch(e){SYNC.adapter=null;setSync('error','Could not reach the sync service. The app still works on this device. ('+((e&&e.message)||'error')+')');return}
+  SYNC.adapter.onAuth(user=>{
+    if(user){SYNC.uid=user.uid;SYNC.email=user.email||'';startWatch()}
+    else{if(SYNC.unsub)SYNC.unsub();SYNC.unsub=null;SYNC.uid=null;SYNC.email=null;SYNC.merged=false;setSync('signedout')}
+  });
+}
+function renderSyncUI(){
+  const st=SYNC.state,chip=$('syncChip');
+  const L={off:'This device only',connecting:'Connecting…',signedout:'Not signed in',loading:'Loading…',saving:'Saving…',synced:'Synced',error:'Sync problem'};
+  chip.textContent=(st==='synced'?'☁ ':'')+L[st];chip.className='syncchip sc-'+st;
+  const on=!!SYNC.uid;
+  $('syncOff').hidden=st!=='off';$('syncAuth').hidden=st==='off'||on||st==='connecting';$('syncIn').hidden=!on;
+  $('syncWho').textContent=on?SYNC.email:'';
+  $('syncErr').textContent=SYNC.err||'';$('syncErr').hidden=!SYNC.err;
+  $('privNoteData').textContent=on?'Your numbers are saved to your account and show on every phone or computer where you sign in. A copy is also kept on this device so it works offline; changes sync when you are back online.':'Right now your numbers are saved only in this browser on this device. Sign in above to see them on every device. Back up monthly as a safety copy.';
+}
+async function doAuth(kind){
+  const e=$('syncEmail').value.trim(),p=$('syncPass').value;const msg=$('syncMsg');
+  if(!SYNC.adapter){msg.textContent='Sync is not available right now.';return}
+  if(!e){msg.textContent='Enter your email.';return}
+  try{
+    if(kind==='reset'){await SYNC.adapter.reset(e);msg.textContent='Password reset email sent to '+e+'.';return}
+    if(!p){msg.textContent='Enter your password.';return}
+    msg.textContent=kind==='up'?'Creating account…':'Signing in…';
+    await(kind==='up'?SYNC.adapter.signUp(e,p):SYNC.adapter.signIn(e,p));
+    msg.textContent='';$('syncPass').value='';
+  }catch(err){msg.textContent=friendlyAuthErr(err)}
+}
+$('syncSignIn').addEventListener('click',()=>doAuth('in'));
+$('syncSignUp').addEventListener('click',()=>doAuth('up'));
+$('syncReset').addEventListener('click',()=>doAuth('reset'));
+let signOutArmed=false;
+$('syncSignOut').addEventListener('click',async()=>{
+  if(!signOutArmed){signOutArmed=true;$('syncSignOut').textContent='Tap again — removes the copy on this device';return}
+  signOutArmed=false;$('syncSignOut').textContent='Sign out';
+  try{await Promise.race([SYNC.adapter.pending(),new Promise(r=>setTimeout(r,4000))])}catch(e){}
+  await SYNC.adapter.signOut();
+  try{localStorage.removeItem(KEY)}catch(e){}load();render();showMsg('Signed out. Your numbers stay safe in your account; sign in again on any device.');
+});
+$('syncChip').addEventListener('click',()=>go('setup'));
 
 // ================= boot =================
 try{localStorage.setItem(KEY+'.probe','1');localStorage.removeItem(KEY+'.probe')}catch(e){showMsg('This browser is blocking storage (private/incognito mode?). Open in a normal window so your numbers are saved.')}
@@ -835,6 +1000,8 @@ else if(weekList().length){const days=D.lastBackup?Math.round((new Date(TODAY)-n
 view=storeList().length>1?'overview':storeList().length?'store':'setup';
 $('noStoresBtn').addEventListener('click',()=>go('setup'));
 readHash();
+renderSyncUI();
+initCloud();
 })();
 
 </script>
